@@ -13,24 +13,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Login no GHCR
-        run: echo "${{ secrets.PAT_TOKEN }}" | docker login ghcr.io -u pno-ontec --password-stdin
-
-      - name: Build e Push
+      - name: Teste de login GHCR
         run: |
-          DOCKER_BUILDKIT=0 docker build -t ghcr.io/pno-ontec/financehub:latest .
-          docker push ghcr.io/pno-ontec/financehub:latest
-
-      - name: Deploy na VPS
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USER }}
-          key: ${{ secrets.VPS_SSH_KEY }}
-          script: |
-            cd ~/financehub
-            echo "${{ secrets.PAT_TOKEN }}" | docker login ghcr.io -u pno-ontec --password-stdin
-            docker compose pull app
-            docker compose up -d --no-deps app nginx
-            sleep 10
-            docker compose ps
+          echo "${{ secrets.PAT_TOKEN }}" | docker login ghcr.io -u pno-ontec --password-stdin
+          echo "Login OK"
+          docker pull hello-world
+          docker tag hello-world ghcr.io/pno-ontec/financehub:test
+          docker push ghcr.io/pno-ontec/financehub:test
+          echo "Push teste OK"
