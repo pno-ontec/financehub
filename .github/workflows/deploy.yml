@@ -28,8 +28,8 @@ jobs:
           script: |
             cd ~/financehub
             echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
-            # Usando hífen para garantir compatibilidade
             docker-compose pull
+            docker-compose down  # <--- Adicione isso para remover o container antigo antes
             docker-compose up -d
 
       - name: Set up QEMU
@@ -43,6 +43,8 @@ jobs:
         with:
           context: .
           push: true
-          platforms: linux/arm64  # <--- Força a arquitetura da Oracle
+          platforms: linux/arm64
           tags: ghcr.io/${{ github.repository }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
