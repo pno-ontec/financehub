@@ -7,7 +7,7 @@ services:
 
   # ── Aplicação Node.js ────────────────────────────────────────────────────────
   app:
-    image: ghcr.io/${GITHUB_USER}/financehub:latest   # imagem do GitHub Container Registry
+    image: ghcr.io/pno-ontec/financehub:latest   # imagem do GitHub Container Registry
     container_name: financehub_app
     restart: unless-stopped
 
