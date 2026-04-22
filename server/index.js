@@ -73,7 +73,7 @@ app.use(helmet({ contentSecurityPolicy: false, hsts: false }));app.use(cors({
 }));
 
 app.use(rateLimit({ windowMs:15*60*1000, max:300, standardHeaders:true, legacyHeaders:false }));
-const authLimiter = rateLimit({ windowMs:15*60*1000, max:15, skipSuccessfulRequests:true });
+const authLimiter = rateLimit({ windowMs:15*60*1000, max:100, skipSuccessfulRequests:true });
 
 app.use(compression());
 app.use(express.json({ limit:'5mb' }));
