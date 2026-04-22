@@ -1,5 +1,3 @@
-# Cria o arquivo correto
-$content = @'
 name: Build e Deploy FinanceHub
 
 on:
@@ -55,8 +53,3 @@ jobs:
             docker compose up -d --no-deps app nginx
             sleep 10
             docker compose ps
-'@
-
-New-Item -Path ".github\workflows" -ItemType Directory -Force
-$content | Out-File -FilePath ".github\workflows\deploy.yml" -Encoding UTF8
-echo "Criado!"
