@@ -16,20 +16,11 @@ jobs:
       - name: Login no GHCR
         run: echo "${{ secrets.PAT_TOKEN }}" | docker login ghcr.io -u pno-ontec --password-stdin
 
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
+      - name: Build imagem
+        run: docker build -t ghcr.io/pno-ontec/financehub:latest .
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Build e Push
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: ./Dockerfile
-          push: true
-          platforms: linux/amd64
-          tags: ghcr.io/pno-ontec/financehub:latest
+      - name: Push imagem
+        run: docker push ghcr.io/pno-ontec/financehub:latest
 
       - name: Deploy na VPS
         uses: appleboy/ssh-action@v1.0.3
