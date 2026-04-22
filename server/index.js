@@ -60,7 +60,7 @@ const app   = express();
 const PORT  = process.env.PORT || 3000;
 const isDev = process.env.NODE_ENV !== 'production';
 
-app.use(helmet({ contentSecurityPolicy: isDev ? false : undefined, hsts: isDev ? false : undefined }));app.use(cors({
+app.use(helmet({ contentSecurityPolicy: false, hsts: false }));app.use(cors({
   origin: (origin, cb) => {
     if (!origin || isDev) return cb(null, true);
     const allowed = (process.env.ALLOWED_ORIGINS||'').split(',').map(o=>o.trim());
