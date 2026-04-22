@@ -119,7 +119,7 @@ app.use((err,_req,res,_next)=>{
   res.status(err.status||500).json({ error: err.message||'Erro interno' });
 });
 
-const HOST = isDev ? '0.0.0.0' : '127.0.0.1';
+const HOST = '0.0.0.0';
 app.listen(PORT, HOST, ()=>{
   console.log(`\n✅  FinanceHub v5 em http://localhost:${PORT}`);
   console.log(`   Admin: ${process.env.ADMIN_EMAIL}\n`);
