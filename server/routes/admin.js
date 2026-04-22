@@ -13,22 +13,22 @@ function adminOnly(req, res, next) {
 }
 
 // ── Estatísticas ───────────────────────────────────────────────────────────────
-router.get('/stats', verifyToken, adminOnly, (_req, res) => {
-  const totalTenants   = queryOne('SELECT COUNT(*) as n FROM tenants', []).n;
-  const activeSubs     = queryOne(`SELECT COUNT(*) as n FROM subscriptions WHERE status='active' AND plan NOT IN ('trial','admin')`, []).n;
-  const trialActive    = queryOne(`SELECT COUNT(*) as n FROM subscriptions WHERE plan='trial' AND status='active' AND trial_ends_at > datetime('now')`, []).n;
-  const trialExpired   = queryOne(`SELECT COUNT(*) as n FROM subscriptions WHERE plan='trial' AND (status='expired' OR trial_ends_at <= datetime('now'))`, []).n;
-  const totalRevenue   = queryOne(`SELECT COALESCE(SUM(amount_cents),0) as n FROM pix_payments WHERE status='paid'`, []).n;
-  const pendingPayments= queryOne(`SELECT COUNT(*) as n FROM pix_payments WHERE status='pending'`, []).n;
-  const referrals      = queryOne(`SELECT COUNT(*) as n FROM referrals WHERE status='rewarded'`, []).n;
-  const adminAccounts  = queryOne(`SELECT COUNT(*) as n FROM subscriptions WHERE plan='admin'`, []).n;
-  const lifetimeAccounts = queryOne(`SELECT COUNT(*) as n FROM subscriptions WHERE current_period_end >= '2090-01-01'`, []).n;
+router.get('/stats', verifyToken, adminOnly, async (_req, res) => {
+  const totalTenants   = await queryOne('SELECT COUNT(*) as n FROM tenants', []).n;
+  const activeSubs     = await queryOne(`SELECT COUNT(*) as n FROM subscriptions WHERE status='active' AND plan NOT IN ('trial','admin')`, []).n;
+  const trialActive    = await queryOne(`SELECT COUNT(*) as n FROM subscriptions WHERE plan='trial' AND status='active' AND trial_ends_at > NOW()`, []).n;
+  const trialExpired   = await queryOne(`SELECT COUNT(*) as n FROM subscriptions WHERE plan='trial' AND (status='expired' OR trial_ends_at <= NOW())`, []).n;
+  const totalRevenue   = await queryOne(`SELECT COALESCE(SUM(amount_cents),0) as n FROM pix_payments WHERE status='paid'`, []).n;
+  const pendingPayments= await queryOne(`SELECT COUNT(*) as n FROM pix_payments WHERE status='pending'`, []).n;
+  const referrals      = await queryOne(`SELECT COUNT(*) as n FROM referrals WHERE status='rewarded'`, []).n;
+  const adminAccounts  = await queryOne(`SELECT COUNT(*) as n FROM subscriptions WHERE plan='admin'`, []).n;
+  const lifetimeAccounts = await queryOne(`SELECT COUNT(*) as n FROM subscriptions WHERE current_period_end >= '2090-01-01'`, []).n;
   res.json({ totalTenants, activeSubs, trialActive, trialExpired, totalRevenue, pendingPayments, referrals, adminAccounts, lifetimeAccounts });
 });
 
 // ── Lista todos os tenants ─────────────────────────────────────────────────────
-router.get('/tenants', verifyToken, adminOnly, (_req, res) => {
-  const tenants = query(`
+router.get('/tenants', verifyToken, adminOnly, async (_req, res) => {
+  const tenants = await query(`
     SELECT t.id as tenant_id, t.name as tenant_name, t.created_at as tenant_created,
       u.id as owner_id, u.email as owner_email, u.name as owner_name,
       u.referral_code, u.status as user_status,
@@ -47,8 +47,8 @@ router.get('/tenants', verifyToken, adminOnly, (_req, res) => {
 });
 
 // ── Lista pagamentos ──────────────────────────────────────────────────────────
-router.get('/payments', verifyToken, adminOnly, (_req, res) => {
-  const payments = query(`
+router.get('/payments', verifyToken, adminOnly, async (_req, res) => {
+  const payments = await query(`
     SELECT p.*, t.name as tenant_name, u.email as owner_email, u.name as owner_name
     FROM pix_payments p
     JOIN tenants t ON t.id=p.tenant_id
@@ -59,8 +59,8 @@ router.get('/payments', verifyToken, adminOnly, (_req, res) => {
 });
 
 // ── Lista indicações ───────────────────────────────────────────────────────────
-router.get('/referrals', verifyToken, adminOnly, (_req, res) => {
-  const refs = query(`
+router.get('/referrals', verifyToken, adminOnly, async (_req, res) => {
+  const refs = await query(`
     SELECT r.*,
       ur.name as referrer_name, ur.email as referrer_email, ur.referral_code,
       ud.name as referred_name, ud.email as referred_email
@@ -73,37 +73,37 @@ router.get('/referrals', verifyToken, adminOnly, (_req, res) => {
 });
 
 // ── Confirmar pagamento ────────────────────────────────────────────────────────
-router.post('/confirm/:paymentId', verifyToken, adminOnly, (req, res) => {
+router.post('/confirm/:paymentId', verifyToken, adminOnly, async (req, res) => {
   try {
-    const result = confirmPixPayment(req.params.paymentId);
+    const result = await confirmPixPayment(req.params.paymentId);
     res.json(result);
   } catch(err) { res.status(400).json({ error: err.message }); }
 });
 
 // ── Adicionar dias ─────────────────────────────────────────────────────────────
-router.post('/add-days', verifyToken, adminOnly, (req, res) => {
+router.post('/add-days', verifyToken, adminOnly, async (req, res) => {
   const { tenantId, days } = req.body;
   if (!tenantId || !days) return res.status(400).json({ error: 'tenantId e days são obrigatórios' });
-  addTrialDays(tenantId, Number(days));
+  await addTrialDays(tenantId, Number(days));
   res.json({ ok: true, message: `${days} dia(s) adicionados com sucesso` });
 });
 
 // ── Definir validade específica ───────────────────────────────────────────────
-router.post('/set-expiry', verifyToken, adminOnly, (req, res) => {
+router.post('/set-expiry', verifyToken, adminOnly, async (req, res) => {
   const { tenantId, expiry_date, plan } = req.body;
   if (!tenantId || !expiry_date) return res.status(400).json({ error: 'tenantId e expiry_date obrigatórios' });
 
-  const sub = queryOne('SELECT * FROM subscriptions WHERE tenant_id=?', [tenantId]);
+  const sub = await queryOne('SELECT * FROM subscriptions WHERE tenant_id=?', [tenantId]);
   if (!sub) return res.status(404).json({ error: 'Assinatura não encontrada' });
 
   const newPlan = plan || (sub.plan === 'trial' ? 'individual' : sub.plan);
   const isoDate = new Date(expiry_date).toISOString();
 
-  run(`UPDATE subscriptions SET 
+  await run(`UPDATE subscriptions SET 
     plan=?, status='active',
-    current_period_start=COALESCE(current_period_start, datetime('now')),
+    current_period_start=COALESCE(current_period_start, NOW()),
     current_period_end=?,
-    updated_at=datetime('now')
+    updated_at=NOW()
     WHERE tenant_id=?`,
     [newPlan, isoDate, tenantId]);
 
@@ -111,19 +111,19 @@ router.post('/set-expiry', verifyToken, adminOnly, (req, res) => {
 });
 
 // ── Licença vitalícia ─────────────────────────────────────────────────────────
-router.post('/set-lifetime/:tenantId', verifyToken, adminOnly, (req, res) => {
+router.post('/set-lifetime/:tenantId', verifyToken, adminOnly, async (req, res) => {
   const { plan } = req.body;
   const lifetimeDate = '2099-12-31T23:59:59.000Z';
   const newPlan = plan || 'individual';
 
-  const sub = queryOne('SELECT id FROM subscriptions WHERE tenant_id=?', [req.params.tenantId]);
+  const sub = await queryOne('SELECT id FROM subscriptions WHERE tenant_id=?', [req.params.tenantId]);
   if (!sub) return res.status(404).json({ error: 'Tenant não encontrado' });
 
-  run(`UPDATE subscriptions SET 
+  await run(`UPDATE subscriptions SET 
     plan=?, status='active',
-    current_period_start=datetime('now'),
+    current_period_start=NOW(),
     current_period_end=?,
-    updated_at=datetime('now')
+    updated_at=NOW()
     WHERE tenant_id=?`,
     [newPlan, lifetimeDate, req.params.tenantId]);
 
@@ -131,11 +131,11 @@ router.post('/set-lifetime/:tenantId', verifyToken, adminOnly, (req, res) => {
 });
 
 // ── Marcar como admin master ───────────────────────────────────────────────────
-router.post('/set-admin/:tenantId', verifyToken, adminOnly, (req, res) => {
-  createAdminSubscription(req.params.tenantId);
+router.post('/set-admin/:tenantId', verifyToken, adminOnly, async (req, res) => {
+  await createAdminSubscription(req.params.tenantId);
   // Também promove o user a role admin
-  const owner = queryOne('SELECT id FROM users WHERE tenant_id=?', [req.params.tenantId]);
-  if (owner) run(`UPDATE users SET role='admin' WHERE id=?`, [owner.id]);
+  const owner = await queryOne('SELECT id FROM users WHERE tenant_id=?', [req.params.tenantId]);
+  if (owner) await run(`UPDATE users SET role='admin' WHERE id=?`, [owner.id]);
   res.json({ ok: true, message: 'Conta promovida a administrador master' });
 });
 
@@ -154,7 +154,7 @@ router.post('/create-account', verifyToken, adminOnly, async (req, res) => {
     if (!name || !email) return res.status(400).json({ error: 'name e email são obrigatórios' });
     if (!password || password.length < 6) return res.status(400).json({ error: 'password mínimo de 6 caracteres' });
 
-    const existing = queryOne('SELECT id FROM users WHERE email=?', [email.toLowerCase()]);
+    const existing = await queryOne('SELECT id FROM users WHERE email=?', [email.toLowerCase()]);
     if (existing) return res.status(409).json({ error: 'E-mail já cadastrado' });
 
     const userId   = uuidv4();
@@ -165,33 +165,33 @@ router.post('/create-account', verifyToken, adminOnly, async (req, res) => {
     const base = (name).replace(/[^a-zA-Z]/g,'').toUpperCase().slice(0,4).padEnd(4,'X');
     const refCode = base + Math.random().toString(36).slice(2,6).toUpperCase();
 
-    transaction(() => {
+    await transaction(async (client) => {
       // Cria tenant e usuário
-      run('INSERT INTO tenants (id,owner_id,name) VALUES (?,?,?)',
+      await run('INSERT INTO tenants (id,owner_id,name) VALUES (?,?,?)',
         [tenantId, userId, `Conta de ${name}`]);
-      run(`INSERT INTO users (id,tenant_id,email,password_hash,name,role,referral_code) VALUES (?,?,?,?,?,'owner',?)`,
+      await run(`INSERT INTO users (id,tenant_id,email,password_hash,name,role,referral_code) VALUES (?,?,?,?,?,'owner',?)`,
         [userId, tenantId, email.toLowerCase(), hash, name, refCode]);
-      run(`INSERT INTO entities (id,tenant_id,label,type,color) VALUES (?,?,'CPF — Pessoal','cpf','#00e5a0')`,
+      await run(`INSERT INTO entities (id,tenant_id,label,type,color) VALUES (?,?,'CPF — Pessoal','cpf','#00e5a0')`,
         [uuidv4(), tenantId]);
-      seedCategories(tenantId);
+      await seedCategories(tenantId);
 
       // Define a assinatura conforme os parâmetros
       const trialEnds = new Date(); trialEnds.setDate(trialEnds.getDate() + (trial_days || 15));
 
       if (plan === 'admin') {
-        createAdminSubscription(tenantId);
-        if (plan === 'admin') run(`UPDATE users SET role='admin' WHERE id=?`, [userId]);
+        await createAdminSubscription(tenantId);
+        if (plan === 'admin') await run(`UPDATE users SET role='admin' WHERE id=?`, [userId]);
       } else if (lifetime) {
         const far = '2099-12-31T23:59:59.000Z';
-        run(`INSERT INTO subscriptions (id,tenant_id,plan,status,trial_ends_at,current_period_start,current_period_end) VALUES (?,?,?,'active',?,datetime('now'),?)`,
+        await run(`INSERT INTO subscriptions (id,tenant_id,plan,status,trial_ends_at,current_period_start,current_period_end) VALUES (?,?,?,'active',?,NOW(),?)`,
           [uuidv4(), tenantId, plan, trialEnds.toISOString(), far]);
       } else if (expiry_date) {
         const isoExpiry = new Date(expiry_date).toISOString();
-        run(`INSERT INTO subscriptions (id,tenant_id,plan,status,trial_ends_at,current_period_start,current_period_end) VALUES (?,?,?,'active',?,datetime('now'),?)`,
+        await run(`INSERT INTO subscriptions (id,tenant_id,plan,status,trial_ends_at,current_period_start,current_period_end) VALUES (?,?,?,'active',?,NOW(),?)`,
           [uuidv4(), tenantId, plan, trialEnds.toISOString(), isoExpiry]);
       } else {
         // Trial padrão
-        run(`INSERT INTO subscriptions (id,tenant_id,plan,status,trial_ends_at) VALUES (?,?,'trial','active',?)`,
+        await run(`INSERT INTO subscriptions (id,tenant_id,plan,status,trial_ends_at) VALUES (?,?,'trial','active',?) ON CONFLICT (tenant_id) DO NOTHING`,
           [uuidv4(), tenantId, trialEnds.toISOString()]);
       }
     });
@@ -219,33 +219,33 @@ router.post('/reset-password', verifyToken, adminOnly, async (req, res) => {
     if (!email || !new_password) return res.status(400).json({ error: 'email e new_password obrigatórios' });
     if (new_password.length < 6) return res.status(400).json({ error: 'Senha mínimo 6 caracteres' });
 
-    const user = queryOne('SELECT id FROM users WHERE email=?', [email.toLowerCase()]);
+    const user = await queryOne('SELECT id FROM users WHERE email=?', [email.toLowerCase()]);
     if (!user) return res.status(404).json({ error: 'Usuário não encontrado' });
 
     const hash = await hashPassword(new_password);
-    run('UPDATE users SET password_hash=?, login_attempts=0, locked_until=NULL WHERE id=?', [hash, user.id]);
+    await run('UPDATE users SET password_hash=?, login_attempts=0, locked_until=NULL WHERE id=?', [hash, user.id]);
     res.json({ ok: true, message: `Senha de ${email} alterada com sucesso` });
   } catch(err) { res.status(500).json({ error: err.message }); }
 });
 
 // ── Bloquear / desbloquear ────────────────────────────────────────────────────
-router.post('/block/:tenantId', verifyToken, adminOnly, (req, res) => {
-  run(`UPDATE subscriptions SET plan='blocked', status='expired' WHERE tenant_id=?`, [req.params.tenantId]);
+router.post('/block/:tenantId', verifyToken, adminOnly, async (req, res) => {
+  await run(`UPDATE subscriptions SET plan='blocked', status='expired' WHERE tenant_id=?`, [req.params.tenantId]);
   res.json({ ok: true });
 });
 
-router.post('/unblock/:tenantId', verifyToken, adminOnly, (req, res) => {
+router.post('/unblock/:tenantId', verifyToken, adminOnly, async (req, res) => {
   const newEnd = new Date(); newEnd.setDate(newEnd.getDate() + 7);
-  run(`UPDATE subscriptions SET plan='trial', status='active', trial_ends_at=? WHERE tenant_id=?`,
+  await run(`UPDATE subscriptions SET plan='trial', status='active', trial_ends_at=? WHERE tenant_id=?`,
     [newEnd.toISOString(), req.params.tenantId]);
   res.json({ ok: true });
 });
 
 // ── Deletar conta (cuidado!) ───────────────────────────────────────────────────
-router.delete('/tenant/:tenantId', verifyToken, adminOnly, (req, res) => {
-  const sub = queryOne('SELECT plan FROM subscriptions WHERE tenant_id=?', [req.params.tenantId]);
+router.delete('/tenant/:tenantId', verifyToken, adminOnly, async (req, res) => {
+  const sub = await queryOne('SELECT plan FROM subscriptions WHERE tenant_id=?', [req.params.tenantId]);
   if (sub?.plan === 'admin') return res.status(403).json({ error: 'Não é possível deletar uma conta admin' });
-  run('DELETE FROM tenants WHERE id=?', [req.params.tenantId]);
+  await run('DELETE FROM tenants WHERE id=?', [req.params.tenantId]);
   res.json({ ok: true, message: 'Conta deletada (cascade apaga todos os dados)' });
 });
 

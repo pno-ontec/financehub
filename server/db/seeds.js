@@ -34,10 +34,10 @@ const DEFAULT_CATEGORIES = [
   { name: 'Outras Receitas',icon: '💰',  color: '#4a5168', type: 'income', income_type:'avulsa'   },
 ];
 
-function seedCategories(tenantId) {
+async function seedCategories(tenantId) {
   for (const cat of DEFAULT_CATEGORIES) {
-    run(
-      `INSERT OR IGNORE INTO categories (id, tenant_id, name, icon, color, type, income_type)
+    await run(
+      `INSERT INTO categories (id, tenant_id, name, icon, color, type, income_type)
        VALUES (?, ?, ?, ?, ?, ?, ?)`,
       [uuidv4(), tenantId, cat.name, cat.icon, cat.color, cat.type, cat.income_type||null]
     );

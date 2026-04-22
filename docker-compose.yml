@@ -1,48 +1,84 @@
-# ─────────────────────────────────────────────────────────────────────────────
-# FinanceHub — docker-compose.yml (PRODUÇÃO)
-# Uso na VPS: docker compose up -d
-# ─────────────────────────────────────────────────────────────────────────────
+# FinanceHub — docker-compose.yml PRODUÇÃO com PostgreSQL
+# Uso: docker compose up -d
 
 services:
 
-  # ── Aplicação Node.js ────────────────────────────────────────────────────────
-  app:
-    image: ghcr.io/pno-ontec/financehub:latest   # imagem do GitHub Container Registry
-    container_name: financehub_app
+  # ── PostgreSQL ────────────────────────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: financehub_postgres
     restart: unless-stopped
 
-    volumes:
-      - financehub_data:/app/server/data               # dados criptografados persistidos
-      - financehub_uploads:/app/server/uploads
-
-    env_file:
-      - ./server/.env                                  # arquivo .env na VPS (nunca no git)
-
     environment:
-      - NODE_ENV=production
+      POSTGRES_DB:       ${PGDATABASE:-financehub}
+      POSTGRES_USER:     ${PGUSER:-financehub}
+      POSTGRES_PASSWORD: ${PGPASSWORD}
+
+    volumes:
+      - pg_data:/var/lib/postgresql/data
 
     networks:
       - financehub_net
 
-    # NÃO expõe porta para fora — apenas o Nginx acessa internamente
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${PGUSER:-financehub} -d ${PGDATABASE:-financehub}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+    # Limita recursos
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+
+  # ── Aplicação Node.js ────────────────────────────────────────────────────────
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: financehub_app
+    restart: unless-stopped
+
+    env_file:
+      - .env
+
+    environment:
+      NODE_ENV:   production
+      PGHOST:     postgres
+      PGPORT:     "5432"
+      PGDATABASE: ${PGDATABASE:-financehub}
+      PGUSER:     ${PGUSER:-financehub}
+      PGPASSWORD: ${PGPASSWORD}
+
+    volumes:
+      - app_uploads:/app/server/uploads
+
+    networks:
+      - financehub_net
+
     expose:
       - "3000"
+
+    depends_on:
+      postgres:
+        condition: service_healthy
 
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/api/health"]
       interval: 30s
       timeout: 5s
       retries: 3
-      start_period: 15s
+      start_period: 30s
 
-    # Limita recursos (evita consumo excessivo)
     deploy:
       resources:
         limits:
           memory: 512M
           cpus: "1.0"
 
-  # ── Nginx Reverse Proxy + SSL ────────────────────────────────────────────────
+  # ── Nginx ─────────────────────────────────────────────────────────────────────
   nginx:
     image: nginx:1.25-alpine
     container_name: financehub_nginx
@@ -56,7 +92,6 @@ services:
       - ./nginx/financehub-docker.conf:/etc/nginx/conf.d/default.conf:ro
       - certbot_www:/var/www/certbot:ro
       - certbot_conf:/etc/letsencrypt:ro
-      - nginx_logs:/var/log/nginx
 
     networks:
       - financehub_net
@@ -65,36 +100,12 @@ services:
       app:
         condition: service_healthy
 
-    healthcheck:
-      test: ["CMD", "nginx", "-t"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-
-  # ── Certbot (renovação automática SSL) ───────────────────────────────────────
-  certbot:
-    image: certbot/certbot:latest
-    container_name: financehub_certbot
-    restart: unless-stopped
-
-    volumes:
-      - certbot_www:/var/www/certbot
-      - certbot_conf:/etc/letsencrypt
-
-    # Renova a cada 12h (certbot só age se faltam <30 dias)
-    entrypoint: /bin/sh -c "trap exit TERM; while :; do certbot renew --webroot -w /var/www/certbot --quiet; sleep 12h & wait $${!}; done"
-
-    networks:
-      - financehub_net
-
-# ─────────────────────────────────────────────────────────────────────────────
 networks:
   financehub_net:
     driver: bridge
 
 volumes:
-  financehub_data:      # dados criptografados AES-256
-  financehub_uploads:   # uploads temporários
-  certbot_www:          # desafio ACME do Let's Encrypt
-  certbot_conf:         # certificados SSL
-  nginx_logs:           # logs do Nginx
+  pg_data:       # dados do PostgreSQL (persiste entre restarts)
+  app_uploads:   # uploads de OFX/CSV
+  certbot_www:   # Let's Encrypt challenge
+  certbot_conf:  # certificados SSL

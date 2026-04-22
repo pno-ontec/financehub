@@ -5,8 +5,8 @@ const { query, queryOne, run, transaction } = require('../db/database');
 const tid = req => req.user.tenantId;
 
 // ── GET /api/debt ─────────────────────────────────────────────────────────────
-router.get('/', (req, res) => {
-  const debts = query(`
+router.get('/', async (req, res) => {
+  const debts = await query(`
     SELECT d.*, e.label as entity_label, tx.description as tx_description
     FROM debts d
     LEFT JOIN entities e ON e.id=d.entity_id
@@ -17,27 +17,27 @@ router.get('/', (req, res) => {
 });
 
 // ── POST /api/debt — Marcar lançamento como dívida ────────────────────────────
-router.post('/', (req, res) => {
+router.post('/', async (req, res) => {
   const t = tid(req);
   const { transaction_id, description, original_amount, creditor, entity_id, notes } = req.body;
   if (!description || !original_amount) return res.status(400).json({ error: 'description e original_amount obrigatórios' });
 
   // Se veio de uma transação existente, remove do fluxo normal marcando como dívida
   if (transaction_id) {
-    run(`UPDATE transactions SET status='debt' WHERE id=? AND tenant_id=?`, [transaction_id, t]);
+    await run(`UPDATE transactions SET status='debt' WHERE id=? AND tenant_id=?`, [transaction_id, t]);
   }
 
   const id = uuidv4();
-  run(`INSERT INTO debts (id,tenant_id,transaction_id,entity_id,description,original_amount,remaining_amount,creditor,notes,status)
+  await run(`INSERT INTO debts (id,tenant_id,transaction_id,entity_id,description,original_amount,remaining_amount,creditor,notes,status)
     VALUES (?,?,?,?,?,?,?,'active',?,?,?)`,
     [id, t, transaction_id||null, entity_id||null, description,
      parseFloat(original_amount), parseFloat(original_amount), creditor||null, notes||null, 'active']);
 
-  res.status(201).json(queryOne('SELECT * FROM debts WHERE id=?', [id]));
+  res.status(201).json(await queryOne('SELECT * FROM debts WHERE id=?', [id]));
 });
 
 // ── PUT /api/debt/:id ─────────────────────────────────────────────────────────
-router.put('/:id', (req, res) => {
+router.put('/:id', async (req, res) => {
   const t = tid(req);
   const allowed = ['status','notes','creditor','payment_start_date','payment_type',
     'payment_amount','payment_pct','installment_count','remaining_amount'];
@@ -46,32 +46,32 @@ router.put('/:id', (req, res) => {
   if (!sets.length) return res.status(400).json({ error: 'Nada para atualizar' });
   sets.push('updated_at=datetime(\'now\')');
   params.push(req.params.id, t);
-  run(`UPDATE debts SET ${sets.join(',')} WHERE id=? AND tenant_id=?`, params);
-  res.json(queryOne('SELECT * FROM debts WHERE id=?', [req.params.id]));
+  await run(`UPDATE debts SET ${sets.join(',')} WHERE id=? AND tenant_id=?`, params);
+  res.json(await queryOne('SELECT * FROM debts WHERE id=?', [req.params.id]));
 });
 
 // ── DELETE /api/debt/:id ──────────────────────────────────────────────────────
-router.delete('/:id', (req, res) => {
-  const debt = queryOne('SELECT transaction_id FROM debts WHERE id=? AND tenant_id=?', [req.params.id, tid(req)]);
+router.delete('/:id', async (req, res) => {
+  const debt = await queryOne('SELECT transaction_id FROM debts WHERE id=? AND tenant_id=?', [req.params.id, tid(req)]);
   if (debt?.transaction_id) {
-    run(`UPDATE transactions SET status='pending' WHERE id=?`, [debt.transaction_id]);
+    await run(`UPDATE transactions SET status='pending' WHERE id=?`, [debt.transaction_id]);
   }
-  run('DELETE FROM debts WHERE id=? AND tenant_id=?', [req.params.id, tid(req)]);
+  await run('DELETE FROM debts WHERE id=? AND tenant_id=?', [req.params.id, tid(req)]);
   res.json({ message: 'Dívida removida' });
 });
 
 // ── POST /api/debt/:id/simulate — Simulação de quitação ──────────────────────
-router.post('/:id/simulate', (req, res) => {
+router.post('/:id/simulate', async (req, res) => {
   const t = tid(req);
-  const debt = queryOne('SELECT * FROM debts WHERE id=? AND tenant_id=?', [req.params.id, t]);
+  const debt = await queryOne('SELECT * FROM debts WHERE id=? AND tenant_id=?', [req.params.id, t]);
   if (!debt) return res.status(404).json({ error: 'Dívida não encontrada' });
 
   // Busca rendas para calcular capacidade de pagamento
-  const incomeSources = query(`SELECT amount, net_salary FROM income_sources WHERE tenant_id=? AND is_active=1`, [t]);
+  const incomeSources = await query(`SELECT amount, net_salary FROM income_sources WHERE tenant_id=? AND is_active=1`, [t]);
   const monthlyIncome = incomeSources.reduce((s, i) => s + (i.net_salary || i.amount || 0), 0);
 
   // Despesas fixas mensais
-  const fixedExpenses = queryOne(`
+  const fixedExpenses = await queryOne(`
     SELECT COALESCE(SUM(amount),0) as total FROM recurring_contracts
     WHERE tenant_id=? AND status='active' AND flow='out'
   `, [t]).total || 0;
@@ -136,22 +136,22 @@ router.post('/:id/simulate', (req, res) => {
 });
 
 // ── POST /api/debt/:id/schedule-payment — Programar pagamento ─────────────────
-router.post('/:id/schedule-payment', (req, res) => {
+router.post('/:id/schedule-payment', async (req, res) => {
   const t = tid(req);
   const { payment_type, payment_amount, payment_pct, installment_count, payment_start_date } = req.body;
 
-  run(`UPDATE debts SET
+  await run(`UPDATE debts SET
     status='negotiating', payment_type=?, payment_amount=?, payment_pct=?,
-    installment_count=?, payment_start_date=?, updated_at=datetime('now')
+    installment_count=?, payment_start_date=?, updated_at=NOW()
     WHERE id=? AND tenant_id=?`,
     [payment_type, payment_amount||null, payment_pct||null,
      installment_count||null, payment_start_date||null, req.params.id, t]);
 
   // Se for parcelamento, cria recorrente automático
   if (payment_type === 'installment' && payment_amount && payment_start_date) {
-    const debt = queryOne('SELECT * FROM debts WHERE id=?', [req.params.id]);
+    const debt = await queryOne('SELECT * FROM debts WHERE id=?', [req.params.id]);
     const nextDue = new Date(payment_start_date);
-    run(`INSERT INTO recurring_contracts
+    await run(`INSERT INTO recurring_contracts
       (id,tenant_id,entity_id,description,amount,flow,frequency,start_date,next_due_date,day_of_month,status,notes)
       VALUES (?,?,?,?,?,'out','monthly',?,?,?,,'active',?)`,
       [uuidv4(), t, debt.entity_id,

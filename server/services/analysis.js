@@ -10,13 +10,13 @@ const { query, queryOne } = require('../db/database');
  */
 
 // ── Análise de Cartão de Crédito ──────────────────────────────────────────────
-function analyzeCreditCards(tenantId, months = 3) {
+async function analyzeCreditCards(tenantId, months = 3) {
   const cutoff = new Date();
   cutoff.setMonth(cutoff.getMonth() - months);
   const cutoffStr = cutoff.toISOString().slice(0, 10);
 
   // Busca todas as transações de cartão
-  const txs = query(`
+  const txs = await query(`
     SELECT tx.*, a.name as account_name, a.credit_limit, a.type as account_type,
       cat.name as category_name, cat.icon as category_icon
     FROM transactions tx
@@ -28,7 +28,7 @@ function analyzeCreditCards(tenantId, months = 3) {
   `, [tenantId, cutoffStr]);
 
   // Todas as contas de crédito
-  const cards = query(
+  const cards = await query(
     `SELECT * FROM accounts WHERE tenant_id=? AND type='credit' AND is_active=1`,
     [tenantId]
   );
@@ -46,7 +46,7 @@ function analyzeCreditCards(tenantId, months = 3) {
   return { cards: results, consolidated };
 }
 
-function analyzeCard(card, txs, months) {
+async function analyzeCard(card, txs, months) {
   if (!txs.length) return { card, empty: true };
 
   // Agrupa por mês
@@ -184,13 +184,13 @@ function calcDebtRisk(card, avgMonthly, recurring) {
   return { score, level, alerts, fixed_recurring_pct: parseFloat(fixedPct.toFixed(1)), subscriptions_count: subscriptions.length };
 }
 
-function consolidatedCardAnalysis(txs, cards, tenantId, months) {
+async function consolidatedCardAnalysis(txs, cards, tenantId, months) {
   const totalSpend   = txs.reduce((s, t) => s + t.amount, 0);
   const avgMonthly   = totalSpend / months;
   const totalLimit   = cards.reduce((s, c) => s + (c.credit_limit || 0), 0);
 
   // Renda líquida do tenant
-  const incomeSources = query(
+  const incomeSources = await query(
     `SELECT COALESCE(SUM(net_salary), 0) + COALESCE(SUM(CASE WHEN net_salary=0 THEN amount ELSE 0 END), 0) as total_net FROM income_sources WHERE tenant_id=? AND is_active=1`,
     [tenantId]
   );
@@ -218,13 +218,13 @@ function consolidatedCardAnalysis(txs, cards, tenantId, months) {
 }
 
 // ── Score de Saúde Financeira ──────────────────────────────────────────────────
-function financialHealthScore(tenantId) {
+async function financialHealthScore(tenantId) {
   const now     = new Date();
   const m3ago   = new Date(); m3ago.setMonth(m3ago.getMonth() - 3);
   const cutoff  = m3ago.toISOString().slice(0, 10);
 
   // Receitas e despesas dos últimos 3 meses
-  const summary = queryOne(`
+  const summary = await queryOne(`
     SELECT
       COALESCE(SUM(CASE WHEN flow='in' AND status='paid' THEN amount ELSE 0 END),0) as receitas,
       COALESCE(SUM(CASE WHEN flow='out' AND status='paid' THEN amount ELSE 0 END),0) as despesas,
@@ -238,7 +238,7 @@ function financialHealthScore(tenantId) {
   const savingsRate = avgRec > 0 ? ((avgRec - avgDes) / avgRec) * 100 : 0;
 
   // Parcelamentos ativos
-  const installments = queryOne(`
+  const installments = await queryOne(`
     SELECT COUNT(*) as active, COALESCE(SUM(installment_amount),0) as monthly_commit
     FROM installment_contracts WHERE tenant_id=? AND status='active'
   `, [tenantId]);
@@ -246,7 +246,7 @@ function financialHealthScore(tenantId) {
   const installCommitPct = avgRec > 0 ? ((installments.monthly_commit || 0) / avgRec) * 100 : 0;
 
   // Contas em atraso
-  const overdueCount = queryOne(
+  const overdueCount = await queryOne(
     `SELECT COUNT(*) as n FROM transactions WHERE tenant_id=? AND status='overdue'`, [tenantId]
   ).n;
 
@@ -291,11 +291,11 @@ function financialHealthScore(tenantId) {
 }
 
 // ── Tendências de Gastos ───────────────────────────────────────────────────────
-function spendingTrends(tenantId, months = 6) {
+async function spendingTrends(tenantId, months = 6) {
   const cutoff = new Date();
   cutoff.setMonth(cutoff.getMonth() - months);
 
-  const txs = query(`
+  const txs = await query(`
     SELECT tx.date, tx.amount, tx.flow, tx.status,
       cat.name as category, cat.type as cat_type, a.type as account_type
     FROM transactions tx
@@ -345,18 +345,18 @@ function spendingTrends(tenantId, months = 6) {
 }
 
 // ── Budget Alerts ─────────────────────────────────────────────────────────────
-function budgetAlerts(tenantId) {
+async function budgetAlerts(tenantId) {
   const alerts = [];
   const now = new Date();
   const thisMonth = now.toISOString().slice(0, 7);
 
   // Contas próximas do vencimento (próximos 7 dias)
-  const upcoming = query(`
+  const upcoming = await query(`
     SELECT tx.description, tx.amount, tx.date, tx.status, a.name as account_name
     FROM transactions tx
     LEFT JOIN accounts a ON a.id=tx.account_id
     WHERE tx.tenant_id=? AND tx.flow='out' AND tx.status='pending'
-      AND tx.date BETWEEN date('now') AND date('now', '+7 days')
+      AND tx.date BETWEEN CURRENT_DATE AND CURRENT_DATE + '+7 days')
     ORDER BY tx.date
   `, [tenantId]);
 
@@ -371,7 +371,7 @@ function budgetAlerts(tenantId) {
   });
 
   // Contas atrasadas
-  const overdue = query(`
+  const overdue = await query(`
     SELECT description, amount, date FROM transactions
     WHERE tenant_id=? AND status='overdue' ORDER BY date
   `, [tenantId]);
@@ -386,12 +386,12 @@ function budgetAlerts(tenantId) {
   });
 
   // Parcelas vencendo
-  const instOverdue = query(`
+  const instOverdue = await query(`
     SELECT i.amount, i.due_date, c.description
     FROM installments i
     JOIN installment_contracts c ON c.id=i.contract_id
     WHERE i.tenant_id=? AND i.status IN('pending','overdue')
-      AND i.due_date BETWEEN date('now','-5 days') AND date('now','+7 days')
+      AND i.due_date BETWEEN CURRENT_DATE +'-5 days') AND CURRENT_DATE +'+7 days')
     ORDER BY i.due_date
   `, [tenantId]);
 

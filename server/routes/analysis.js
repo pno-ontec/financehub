@@ -5,13 +5,13 @@ const { analyzeCreditCards, financialHealthScore, spendingTrends, budgetAlerts }
 const tid = req => req.user.tenantId;
 
 // GET /api/analysis/health — score de saúde financeira
-router.get('/health', (req, res) => {
+router.get('/health', async (req, res) => {
   try { res.json(financialHealthScore(tid(req))); }
   catch(e) { res.status(500).json({ error: e.message }); }
 });
 
 // GET /api/analysis/cards?months=3 — análise de cartão de crédito
-router.get('/cards', (req, res) => {
+router.get('/cards', async (req, res) => {
   try {
     const months = parseInt(req.query.months) || 3;
     res.json(analyzeCreditCards(tid(req), months));
@@ -19,7 +19,7 @@ router.get('/cards', (req, res) => {
 });
 
 // GET /api/analysis/trends?months=6 — tendências de gastos
-router.get('/trends', (req, res) => {
+router.get('/trends', async (req, res) => {
   try {
     const months = parseInt(req.query.months) || 6;
     res.json(spendingTrends(tid(req), months));
@@ -27,13 +27,13 @@ router.get('/trends', (req, res) => {
 });
 
 // GET /api/analysis/alerts — alertas de budget
-router.get('/alerts', (req, res) => {
+router.get('/alerts', async (req, res) => {
   try { res.json(budgetAlerts(tid(req))); }
   catch(e) { res.status(500).json({ error: e.message }); }
 });
 
 // GET /api/analysis/full — tudo de uma vez (para o dashboard)
-router.get('/full', (req, res) => {
+router.get('/full', async (req, res) => {
   try {
     const months = parseInt(req.query.months) || 3;
     res.json({

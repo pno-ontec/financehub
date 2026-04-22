@@ -6,7 +6,7 @@ const { query, queryOne, run } = require('../db/database');
 const tid = req => req.user.tenantId;
 
 // GET /api/installments — lista todos os contratos
-router.get('/', (req, res) => {
+router.get('/', async (req, res) => {
   try {
     const contracts = listContracts(tid(req), {
       status:    req.query.status,
@@ -29,14 +29,14 @@ router.get('/', (req, res) => {
 });
 
 // GET /api/installments/:id — detalhe com parcelas
-router.get('/:id', (req, res) => {
+router.get('/:id', async (req, res) => {
   const contract = getContract(req.params.id, tid(req));
   if (!contract) return res.status(404).json({ error: 'Contrato não encontrado' });
   res.json(contract);
 });
 
 // POST /api/installments — cria contrato
-router.post('/', (req, res) => {
+router.post('/', async (req, res) => {
   try {
     const required = ['description','total_amount','total_installments','first_due_date'];
     for (const f of required) {
@@ -50,7 +50,7 @@ router.post('/', (req, res) => {
 });
 
 // PUT /api/installments/:id — edita metadados do contrato
-router.put('/:id', (req, res) => {
+router.put('/:id', async (req, res) => {
   const t = tid(req);
   const allowed = ['description','status','notes','account_id','entity_id','category_id'];
   const sets=[],params=[];
@@ -63,14 +63,14 @@ router.put('/:id', (req, res) => {
 });
 
 // DELETE /api/installments/:id — cancela contrato
-router.delete('/:id', (req, res) => {
-  run(`UPDATE installment_contracts SET status='cancelled' WHERE id=? AND tenant_id=?`,
+router.delete('/:id', async (req, res) => {
+  await run(`UPDATE installment_contracts SET status='cancelled' WHERE id=? AND tenant_id=?`,
     [req.params.id, tid(req)]);
   res.json({ message: 'Contrato cancelado' });
 });
 
 // POST /api/installments/:id/pay/:installmentId — pagar parcela
-router.post('/:id/pay/:installmentId', (req, res) => {
+router.post('/:id/pay/:installmentId', async (req, res) => {
   try {
     const result = payInstallment(req.params.installmentId, tid(req), req.body.paid_date);
     res.json(result);
@@ -80,13 +80,13 @@ router.post('/:id/pay/:installmentId', (req, res) => {
 });
 
 // GET /api/installments/:id/schedule — tabela de amortização
-router.get('/:id/schedule', (req, res) => {
+router.get('/:id/schedule', async (req, res) => {
   const t = tid(req);
-  const contract = queryOne('SELECT * FROM installment_contracts WHERE id=? AND tenant_id=?',
+  const contract = await queryOne('SELECT * FROM installment_contracts WHERE id=? AND tenant_id=?',
     [req.params.id, t]);
   if (!contract) return res.status(404).json({ error: 'Contrato não encontrado' });
 
-  const installments = query(
+  const installments = await query(
     `SELECT * FROM installments WHERE contract_id=? ORDER BY number`,
     [req.params.id]
   );

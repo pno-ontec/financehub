@@ -1,0 +1,11 @@
+# FinanceHub — Variáveis de ambiente para Docker Compose
+# Este arquivo é lido automaticamente pelo docker-compose
+# NÃO commite este arquivo no git!
+
+# E-mail do administrador master (acesso gratuito e permanente)
+ADMIN_EMAIL=paulinho.n.oliveira@gmail.com
+
+# Chave da API Anthropic (para interpretação de fotos de comprovantes - opcional)
+ANTHROPIC_API_KEY=
+
+# Outros valores são gerados automaticamente pelo container

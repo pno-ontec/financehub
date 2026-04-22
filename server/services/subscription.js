@@ -25,35 +25,35 @@ const PIX_NAME = process.env.PIX_NAME || 'FinanceHub';
 const PIX_CITY = process.env.PIX_CITY || 'SAO PAULO';
 
 // ── Trial ─────────────────────────────────────────────────────────────────────
-function createTrial(tenantId) {
+async function createTrial(tenantId) {
   const trialEnds = new Date();
   trialEnds.setDate(trialEnds.getDate() + 15);
-  run(`INSERT OR IGNORE INTO subscriptions (id,tenant_id,plan,status,trial_ends_at) VALUES (?,?,'trial','active',?)`,
+  await run(`INSERT INTO subscriptions (id,tenant_id,plan,status,trial_ends_at) VALUES (?,?,'trial','active',?) ON CONFLICT (tenant_id) DO NOTHING`,
     [uuidv4(), tenantId, trialEnds.toISOString()]);
 }
 
-function createAdminSubscription(tenantId) {
+async function createAdminSubscription(tenantId) {
   const far = new Date('2099-12-31').toISOString();
-  const existing = queryOne('SELECT id FROM subscriptions WHERE tenant_id=?', [tenantId]);
+  const existing = await queryOne('SELECT id FROM subscriptions WHERE tenant_id=?', [tenantId]);
   if (existing) {
-    run(`UPDATE subscriptions SET plan='admin',status='active',current_period_start=datetime('now'),current_period_end=?,updated_at=datetime('now') WHERE tenant_id=?`,
+    await run(`UPDATE subscriptions SET plan='admin',status='active',current_period_start=NOW(),current_period_end=?,updated_at=NOW() WHERE tenant_id=?`,
       [far, tenantId]);
   } else {
-    run(`INSERT INTO subscriptions (id,tenant_id,plan,status,trial_ends_at,current_period_start,current_period_end) VALUES (?,?,'admin','active',?,datetime('now'),?)`,
+    await run(`INSERT INTO subscriptions (id,tenant_id,plan,status,trial_ends_at,current_period_start,current_period_end) VALUES (?,?,'admin','active',?,NOW(),?)`,
       [uuidv4(), tenantId, far, far]);
   }
 }
 
 // ── Status + custo de CPFs extras ─────────────────────────────────────────────
-function getStatus(tenantId) {
-  const sub = queryOne('SELECT * FROM subscriptions WHERE tenant_id=?', [tenantId]);
+async function getStatus(tenantId) {
+  const sub = await queryOne('SELECT * FROM subscriptions WHERE tenant_id=?', [tenantId]);
   if (!sub) return { allowed: false, reason: 'no_subscription' };
 
   const plan = PLANS[sub.plan] || PLANS.individual;
   const now  = new Date();
 
   // Conta CPFs extras ativos e em trial
-  const extraMembers = query(
+  const extraMembers = await query(
     `SELECT * FROM tenant_members WHERE tenant_id=? AND is_extra_cpf=1 AND status='active'`,
     [tenantId]
   );
@@ -79,7 +79,7 @@ function getStatus(tenantId) {
   if (sub.status === 'active' && sub.current_period_end) {
     const periodEnd = new Date(sub.current_period_end);
     if (now > periodEnd) {
-      run(`UPDATE subscriptions SET status='expired' WHERE id=?`, [sub.id]);
+      await run(`UPDATE subscriptions SET status='expired' WHERE id=?`, [sub.id]);
       return { allowed: false, reason: 'subscription_expired', ...base };
     }
     const daysLeft = Math.ceil((periodEnd - now) / 86400000);
@@ -90,45 +90,45 @@ function getStatus(tenantId) {
 }
 
 // ── Adicionar CPF como membro extra ───────────────────────────────────────────
-function addExtraCpfMember(tenantId, memberId) {
+async function addExtraCpfMember(tenantId, memberId) {
   // Marca membro como extra e inicia trial de 30 dias
   const trialEnd = new Date();
   trialEnd.setDate(trialEnd.getDate() + 30);
-  run(`UPDATE tenant_members SET is_extra_cpf=1, trial_ends_at=?, monthly_cost=500 WHERE id=? AND tenant_id=?`,
+  await run(`UPDATE tenant_members SET is_extra_cpf=1, trial_ends_at=?, monthly_cost=500 WHERE id=? AND tenant_id=?`,
     [trialEnd.toISOString(), memberId, tenantId]);
 }
 
 // ── PIX ───────────────────────────────────────────────────────────────────────
-function createPixCharge(tenantId, plan, referralCode) {
+async function createPixCharge(tenantId, plan, referralCode) {
   const planData = PLANS[plan];
   if (!planData) throw new Error('Plano inválido: ' + plan);
 
   let finalCents = planData.price_cents;
-  const sub = queryOne('SELECT * FROM subscriptions WHERE tenant_id=?', [tenantId]);
+  const sub = await queryOne('SELECT * FROM subscriptions WHERE tenant_id=?', [tenantId]);
   if (sub && sub.referral_pct_credit > 0 && plan.endsWith('_a')) {
     finalCents = Math.round(finalCents * (1 - sub.referral_pct_credit / 100));
   }
 
-  run(`UPDATE pix_payments SET status='cancelled' WHERE tenant_id=? AND status='pending'`, [tenantId]);
+  await run(`UPDATE pix_payments SET status='cancelled' WHERE tenant_id=? AND status='pending'`, [tenantId]);
 
   const id = uuidv4(), txId = id.replace(/-/g,'').slice(0,25).toUpperCase();
   const expires = new Date(); expires.setHours(expires.getHours() + 24);
   const amount  = (finalCents / 100).toFixed(2);
   const payload = buildPixPayload(txId, amount, planData.label);
 
-  run(`INSERT INTO pix_payments (id,tenant_id,plan,amount_cents,status,pix_key,pix_qrcode,pix_copy_paste,expires_at) VALUES (?,?,?,?,'pending',?,?,?,?)`,
+  await run(`INSERT INTO pix_payments (id,tenant_id,plan,amount_cents,status,pix_key,pix_qrcode,pix_copy_paste,expires_at) VALUES (?,?,?,?,'pending',?,?,?,?)`,
     [id, tenantId, plan, finalCents, PIX_KEY, payload, payload, expires.toISOString()]);
 
   if (referralCode) {
-    const referrer = queryOne('SELECT id FROM users WHERE referral_code=?', [referralCode]);
+    const referrer = await queryOne('SELECT id FROM users WHERE referral_code=?', [referralCode]);
     if (referrer) {
-      const buyer = queryOne('SELECT id FROM users WHERE tenant_id=?', [tenantId]);
+      const buyer = await queryOne('SELECT id FROM users WHERE tenant_id=?', [tenantId]);
       if (buyer && buyer.id !== referrer.id) {
-        const existing = queryOne('SELECT id FROM referrals WHERE referred_id=?', [buyer.id]);
+        const existing = await queryOne('SELECT id FROM referrals WHERE referred_id=?', [buyer.id]);
         if (!existing) {
-          run(`INSERT INTO referrals (id,referrer_id,referred_id,status) VALUES (?,?,?,'pending')`,
+          await run(`INSERT INTO referrals (id,referrer_id,referred_id,status) VALUES (?,?,?,'pending')`,
             [uuidv4(), referrer.id, buyer.id]);
-          run(`UPDATE users SET referred_by=? WHERE tenant_id=?`, [referrer.id, tenantId]);
+          await run(`UPDATE users SET referred_by=? WHERE tenant_id=?`, [referrer.id, tenantId]);
         }
       }
     }
@@ -137,9 +137,9 @@ function createPixCharge(tenantId, plan, referralCode) {
   return { id, txId, plan, planData: {...planData, price_cents: finalCents}, payload, expires: expires.toISOString(), discountApplied: finalCents < planData.price_cents };
 }
 
-function confirmPixPayment(paymentId) {
-  return transaction(() => {
-    const payment = queryOne(`SELECT * FROM pix_payments WHERE id=? AND status='pending'`, [paymentId]);
+async function confirmPixPayment(paymentId) {
+  return await transaction(async (client) => {
+    const payment = await queryOne(`SELECT * FROM pix_payments WHERE id=? AND status='pending'`, [paymentId]);
     if (!payment) throw new Error('Cobrança não encontrada ou já processada');
 
     const plan = PLANS[payment.plan];
@@ -147,62 +147,62 @@ function confirmPixPayment(paymentId) {
     const periodEnd = new Date();
     periodEnd.setDate(periodEnd.getDate() + plan.days);
 
-    run(`UPDATE pix_payments SET status='paid', paid_at=? WHERE id=?`, [now.toISOString(), paymentId]);
-    run(`UPDATE subscriptions SET plan=?,status='active',current_period_start=?,current_period_end=?,price_cents=?,referral_pct_credit=0,updated_at=? WHERE tenant_id=?`,
+    await run(`UPDATE pix_payments SET status='paid', paid_at=? WHERE id=?`, [now.toISOString(), paymentId]);
+    await run(`UPDATE subscriptions SET plan=?,status='active',current_period_start=?,current_period_end=?,price_cents=?,referral_pct_credit=0,updated_at=? WHERE tenant_id=?`,
       [payment.plan, now.toISOString(), periodEnd.toISOString(), payment.amount_cents, now.toISOString(), payment.tenant_id]);
 
-    processReferralReward(payment.tenant_id, payment.plan);
+    await processReferralReward(payment.tenant_id, payment.plan);
     return { ok: true, plan: payment.plan, validUntil: periodEnd.toISOString() };
   });
 }
 
-function processReferralReward(newTenantId, plan) {
-  const buyer = queryOne('SELECT id, referred_by FROM users WHERE tenant_id=?', [newTenantId]);
+async function processReferralReward(newTenantId, plan) {
+  const buyer = await queryOne('SELECT id, referred_by FROM users WHERE tenant_id=?', [newTenantId]);
   if (!buyer || !buyer.referred_by) return;
-  const referral = queryOne(`SELECT * FROM referrals WHERE referred_id=? AND status='pending'`, [buyer.id]);
+  const referral = await queryOne(`SELECT * FROM referrals WHERE referred_id=? AND status='pending'`, [buyer.id]);
   if (!referral) return;
   const now = new Date().toISOString();
 
   // Indicado ganha +30 dias
-  const indicadoSub = queryOne('SELECT * FROM subscriptions WHERE tenant_id=?', [newTenantId]);
+  const indicadoSub = await queryOne('SELECT * FROM subscriptions WHERE tenant_id=?', [newTenantId]);
   if (indicadoSub?.current_period_end) {
     const newEnd = new Date(indicadoSub.current_period_end);
     newEnd.setDate(newEnd.getDate() + 30);
-    run(`UPDATE subscriptions SET current_period_end=? WHERE tenant_id=?`, [newEnd.toISOString(), newTenantId]);
+    await run(`UPDATE subscriptions SET current_period_end=? WHERE tenant_id=?`, [newEnd.toISOString(), newTenantId]);
   }
 
   // Indicador ganha +30 dias ou 10% de crédito (anual)
-  const referrerUser = queryOne('SELECT tenant_id FROM users WHERE id=?', [buyer.referred_by]);
+  const referrerUser = await queryOne('SELECT tenant_id FROM users WHERE id=?', [buyer.referred_by]);
   if (referrerUser) {
-    const refSub = queryOne('SELECT * FROM subscriptions WHERE tenant_id=?', [referrerUser.tenant_id]);
+    const refSub = await queryOne('SELECT * FROM subscriptions WHERE tenant_id=?', [referrerUser.tenant_id]);
     if (refSub) {
       if (refSub.plan.endsWith('_a')) {
         const newPct = Math.min((refSub.referral_pct_credit || 0) + 10, 50);
-        run(`UPDATE subscriptions SET referral_pct_credit=? WHERE tenant_id=?`, [newPct, referrerUser.tenant_id]);
+        await run(`UPDATE subscriptions SET referral_pct_credit=? WHERE tenant_id=?`, [newPct, referrerUser.tenant_id]);
       } else if (refSub.current_period_end) {
         const newEnd = new Date(refSub.current_period_end);
         newEnd.setDate(newEnd.getDate() + 30);
-        run(`UPDATE subscriptions SET current_period_end=? WHERE tenant_id=?`, [newEnd.toISOString(), referrerUser.tenant_id]);
+        await run(`UPDATE subscriptions SET current_period_end=? WHERE tenant_id=?`, [newEnd.toISOString(), referrerUser.tenant_id]);
       } else {
         const newEnd = new Date(); newEnd.setDate(newEnd.getDate() + 30);
-        run(`UPDATE subscriptions SET current_period_end=?,status='active' WHERE tenant_id=?`, [newEnd.toISOString(), referrerUser.tenant_id]);
+        await run(`UPDATE subscriptions SET current_period_end=?,status='active' WHERE tenant_id=?`, [newEnd.toISOString(), referrerUser.tenant_id]);
       }
     }
   }
-  run(`UPDATE referrals SET status='rewarded', confirmed_at=? WHERE id=?`, [now, referral.id]);
+  await run(`UPDATE referrals SET status='rewarded', confirmed_at=? WHERE id=?`, [now, referral.id]);
 }
 
-function addTrialDays(tenantId, days) {
-  const sub = queryOne('SELECT * FROM subscriptions WHERE tenant_id=?', [tenantId]);
+async function addTrialDays(tenantId, days) {
+  const sub = await queryOne('SELECT * FROM subscriptions WHERE tenant_id=?', [tenantId]);
   if (!sub) return;
   if (sub.plan === 'trial') {
     const newEnd = new Date(sub.trial_ends_at);
     newEnd.setDate(newEnd.getDate() + days);
-    run(`UPDATE subscriptions SET trial_ends_at=? WHERE tenant_id=?`, [newEnd.toISOString(), tenantId]);
+    await run(`UPDATE subscriptions SET trial_ends_at=? WHERE tenant_id=?`, [newEnd.toISOString(), tenantId]);
   } else {
     const base = sub.current_period_end ? new Date(sub.current_period_end) : new Date();
     base.setDate(base.getDate() + days);
-    run(`UPDATE subscriptions SET current_period_end=?,status='active' WHERE tenant_id=?`, [base.toISOString(), tenantId]);
+    await run(`UPDATE subscriptions SET current_period_end=?,status='active' WHERE tenant_id=?`, [base.toISOString(), tenantId]);
   }
 }
 

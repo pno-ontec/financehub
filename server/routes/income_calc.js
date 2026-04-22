@@ -27,7 +27,7 @@ function calcSimples(annual,anexo='III'){
   for(const f of t){if(annual<=f.ate)return f.rate;}return 22.0;
 }
 
-router.post('/clt',(req,res)=>{
+router.post('/clt',async (req, res) =>{
   const{gross_salary,benefit_health=0,benefit_food=0,benefit_transport=0,dependents=0}=req.body;
   if(!gross_salary)return res.status(400).json({error:'gross_salary obrigatório'});
   const salary=parseFloat(gross_salary);
@@ -43,14 +43,14 @@ router.post('/clt',(req,res)=>{
     net_salary:parseFloat((salary-totalDed).toFixed(2)),effective_rate:parseFloat(((totalDed/salary)*100).toFixed(1))});
 });
 
-router.post('/mei',(req,res)=>{
+router.post('/mei',async (req, res) =>{
   const{revenue,activity='servicos'}=req.body;
   if(!revenue)return res.status(400).json({error:'revenue obrigatório'});
   const rev=parseFloat(revenue),das=MEI_DAS[activity]||75.60;
   res.json({gross_revenue:rev,das_monthly:das,das_annual:das*12,net_revenue:rev-das,limit_annual:81000,limit_remaining:Math.max(0,81000/12-rev)});
 });
 
-router.post('/simples',(req,res)=>{
+router.post('/simples',async (req, res) =>{
   const{monthly_revenue,annual_revenue,anexo='III',pro_labore=0}=req.body;
   if(!monthly_revenue)return res.status(400).json({error:'monthly_revenue obrigatório'});
   const monthly=parseFloat(monthly_revenue),annual=parseFloat(annual_revenue)||monthly*12;

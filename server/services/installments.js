@@ -30,8 +30,8 @@ function generatePriceTable(principal, monthlyRate, n) {
 /**
  * Cria contrato de parcelamento/financiamento e gera todas as parcelas
  */
-function createContract(tenantId, data) {
-  return transaction(() => {
+async function createContract(tenantId, data) {
+  return await transaction(async (client) => {
     const {
       description, type, account_id, entity_id, category_id,
       total_amount, down_payment = 0, interest_rate = 0,
@@ -50,7 +50,7 @@ function createContract(tenantId, data) {
     const dayOfMonth = startDate.getDate();
     const contractId = uuidv4();
 
-    run(
+    await run(
       `INSERT INTO installment_contracts
          (id, tenant_id, account_id, entity_id, category_id,
           description, type, total_amount, financed_amount, down_payment,
@@ -72,7 +72,7 @@ function createContract(tenantId, data) {
       dueDate.setMonth(dueDate.getMonth() + row.number - 1);
       const dueDateStr = dueDate.toISOString().slice(0,10);
       const status = dueDateStr < today ? 'overdue' : 'pending';
-      run(
+      await run(
         `INSERT INTO installments
            (id, contract_id, tenant_id, number, amount, principal, interest, due_date, status)
          VALUES (?,?,?,?,?,?,?,?,?)`,
@@ -83,7 +83,7 @@ function createContract(tenantId, data) {
 
     // Registrar entrada (down_payment como transação se > 0)
     if (down_payment > 0 && account_id) {
-      run(
+      await run(
         `INSERT INTO transactions
            (id, tenant_id, account_id, entity_id, category_id,
             description, amount, flow, status, date, source, is_recurring)
@@ -98,8 +98,8 @@ function createContract(tenantId, data) {
   });
 }
 
-function getContract(contractId, tenantId) {
-  const contract = queryOne(
+async function getContract(contractId, tenantId) {
+  const contract = await queryOne(
     `SELECT c.*,
        a.name as account_name, a.bank as account_bank,
        e.label as entity_label,
@@ -113,14 +113,14 @@ function getContract(contractId, tenantId) {
   );
   if (!contract) return null;
 
-  contract.installments = query(
+  contract.installments = await query(
     `SELECT * FROM installments WHERE contract_id=? ORDER BY number`,
     [contractId]
   );
   return contract;
 }
 
-function listContracts(tenantId, filters = {}) {
+async function listContracts(tenantId, filters = {}) {
   let sql = `
     SELECT c.*,
       a.name as account_name, a.bank as account_bank,
@@ -137,15 +137,15 @@ function listContracts(tenantId, filters = {}) {
   if (filters.status) { sql += ` AND c.status=?`; params.push(filters.status); }
   if (filters.entity_id) { sql += ` AND c.entity_id=?`; params.push(filters.entity_id); }
   sql += ` ORDER BY c.created_at DESC`;
-  return query(sql, params);
+  return await query(sql, params);
 }
 
 /**
  * Marcar parcela como paga e criar transação correspondente
  */
-function payInstallment(installmentId, tenantId, paidDate) {
-  return transaction(() => {
-    const inst = queryOne(
+async function payInstallment(installmentId, tenantId, paidDate) {
+  return await transaction(async (client) => {
+    const inst = await queryOne(
       `SELECT i.*, c.description, c.account_id, c.entity_id, c.category_id, c.type
        FROM installments i
        JOIN installment_contracts c ON c.id = i.contract_id
@@ -159,7 +159,7 @@ function payInstallment(installmentId, tenantId, paidDate) {
     const date = paidDate || new Date().toISOString().slice(0,10);
 
     // Cria transação
-    run(
+    await run(
       `INSERT INTO transactions
          (id, tenant_id, account_id, entity_id, category_id,
           description, amount, flow, status, date, source,
@@ -171,20 +171,20 @@ function payInstallment(installmentId, tenantId, paidDate) {
     );
 
     // Atualiza parcela
-    run(`UPDATE installments SET status='paid', paid_date=?, transaction_id=? WHERE id=?`,
+    await run(`UPDATE installments SET status='paid', paid_date=?, transaction_id=? WHERE id=?`,
       [date, txId, installmentId]);
 
     // Atualiza contador no contrato
-    run(`UPDATE installment_contracts SET paid_installments = paid_installments + 1 WHERE id=?`,
+    await run(`UPDATE installment_contracts SET paid_installments = paid_installments + 1 WHERE id=?`,
       [inst.contract_id]);
 
     // Verifica se quitou
-    const contract = queryOne(
+    const contract = await queryOne(
       `SELECT total_installments, paid_installments FROM installment_contracts WHERE id=?`,
       [inst.contract_id]
     );
     if (contract.paid_installments >= contract.total_installments) {
-      run(`UPDATE installment_contracts SET status='paid_off' WHERE id=?`, [inst.contract_id]);
+      await run(`UPDATE installment_contracts SET status='paid_off' WHERE id=?`, [inst.contract_id]);
     }
 
     return { ok: true, transaction_id: txId };

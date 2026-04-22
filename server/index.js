@@ -46,7 +46,15 @@ const billsRouter         = require('./routes/bills');
 const { verifyToken }       = require('./middleware/auth');
 const { checkSubscription } = require('./middleware/subscription');
 
-require('./db/database');
+const { migrate } = require('./db/database');
+
+// Run DB migrations on startup
+migrate().then(() => {
+  console.log('✅  Database ready');
+}).catch(err => {
+  console.error('❌  Database migration failed:', err.message);
+  process.exit(1);
+});
 
 const app   = express();
 const PORT  = process.env.PORT || 3000;

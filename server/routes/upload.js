@@ -43,12 +43,12 @@ function txHash(date, amount, flow, desc) {
 }
 
 // ── Resolve ou cria conta vinculada ao arquivo ────────────────────────────────
-function resolveOrCreateAccount(tenantId, bankName, accountType, entityId) {
+async function resolveOrCreateAccount(tenantId, bankName, accountType, entityId) {
   const typeMap = {'Conta Corrente':'checking','Poupança':'savings','Cartão de Crédito':'credit','Conta Empresarial':'checking'};
   const type = typeMap[accountType] || 'checking';
 
   // Tenta achar conta com mesmo banco + tipo
-  const existing = queryOne(
+  const existing = await queryOne(
     `SELECT id FROM accounts WHERE tenant_id=? AND bank LIKE ? AND type=? LIMIT 1`,
     [tenantId, `%${bankName.slice(0,30)}%`, type]
   );
@@ -57,14 +57,14 @@ function resolveOrCreateAccount(tenantId, bankName, accountType, entityId) {
   // Cria nova conta
   const newId = uuidv4();
   const colors = { checking:'#0077ff', credit:'#ff4d6d', savings:'#00e5a0', investment:'#f7c948' };
-  run(`INSERT INTO accounts (id,tenant_id,entity_id,name,bank,type,balance,color) VALUES (?,?,?,?,?,?,0,?)`,
+  await run(`INSERT INTO accounts (id,tenant_id,entity_id,name,bank,type,balance,color) VALUES (?,?,?,?,?,?,0,?)`,
     [newId, tenantId, entityId||null, bankName, bankName, type, colors[type]||'#0077ff']);
   console.log(`[upload] Created account: ${bankName} (${type})`);
   return newId;
 }
 
-function resolveCategoryId(tenantId, name) {
-  return queryOne(`SELECT id FROM categories WHERE tenant_id=? AND name=? LIMIT 1`, [tenantId, name])?.id || null;
+async function resolveCategoryId(tenantId, name) {
+  return await queryOne(`SELECT id FROM categories WHERE tenant_id=? AND name=? LIMIT 1`, [tenantId, name])?.id || null;
 }
 
 // ── Parser OFX ────────────────────────────────────────────────────────────────
@@ -124,7 +124,7 @@ function parseCSV(content, bankName, accountType) {
 //   entity         — entity_id vinculado
 //   type           — tipo da conta (override)
 //   responsible_user — user_id do responsável (default: usuário logado)
-router.post('/statement', upload.array('files', 10), (req, res) => {
+router.post('/statement', upload.array('files', 10), async (req, res) => {
   if (!req.files||!req.files.length) return res.status(400).json({ error: 'Nenhum arquivo enviado' });
 
   const tenantId       = req.user.tenantId;
@@ -135,14 +135,14 @@ router.post('/statement', upload.array('files', 10), (req, res) => {
   const forceType      = (req.body.type||'').trim();
 
   // Resolve nome do responsável para conciliação
-  const responsibleUser = queryOne('SELECT name FROM users WHERE id=?', [responsibleId]);
+  const responsibleUser = await queryOne('SELECT name FROM users WHERE id=?', [responsibleId]);
   const responsibleName = responsibleUser?.name || 'Usuário';
 
   let totalImported = 0, totalSkipped = 0;
   const errors = [];
   const accountsCreated = [];
 
-  req.files.forEach(file => {
+  for (const file of req.files) {
     try {
       const raw = fs.readFileSync(file.path, 'latin1');
       const ext = path.extname(file.originalname).toLowerCase();
@@ -158,41 +158,41 @@ router.post('/statement', upload.array('files', 10), (req, res) => {
       const usedType = forceType || parsed.detectedType;
 
       // Resolve / cria a conta bancária PARA ESTE ARQUIVO
-      const accountId = resolveOrCreateAccount(tenantId, usedBank, usedType, entityId);
+      const accountId = await resolveOrCreateAccount(tenantId, usedBank, usedType, entityId);
       if (!accountsCreated.find(a => a.id === accountId)) {
-        const acc = queryOne('SELECT name,bank,type FROM accounts WHERE id=?', [accountId]);
+        const acc = await queryOne('SELECT name,bank,type FROM accounts WHERE id=?', [accountId]);
         if (acc) accountsCreated.push({ id: accountId, ...acc });
       }
 
       let fileImported = 0, fileSkipped = 0;
 
-      transaction(() => {
-        parsed.txs.forEach(tx => {
+      await transaction(async (client) => {
+        for (const tx of parsed.txs) {
           const hash = txHash(tx.date, tx.amount, tx.flow, tx.desc);
-          if (queryOne('SELECT id FROM transactions WHERE tenant_id=? AND import_hash=?', [tenantId, hash])) {
+          if (await queryOne('SELECT id FROM transactions WHERE tenant_id=? AND import_hash=?', [tenantId, hash])) {
             fileSkipped++; return;
           }
 
-          const catId  = resolveCategoryId(tenantId, tx.category);
+          const catId  = await resolveCategoryId(tenantId, tx.category);
           const txId   = uuidv4();
 
-          run(`INSERT INTO transactions
+          await run(`INSERT INTO transactions
             (id,tenant_id,account_id,entity_id,category_id,
              description,amount,flow,status,date,
              is_recurring,source,import_hash,created_by,created_at,updated_at)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,datetime('now'),datetime('now'))`,
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,NOW(),NOW())`,
             [txId, tenantId, accountId, entityId||null, catId,
              tx.desc, tx.amount, tx.flow, 'paid', tx.date,
              tx.recurrent?1:0, tx.source, hash, createdBy]);
 
           // Cria registro de conciliação com responsável padrão
-          run(`INSERT OR IGNORE INTO reconciliation
+          await run(`INSERT INTO reconciliation
             (id,tenant_id,transaction_id,responsible_id,responsible_type,responsible_name,status)
             VALUES (?,?,?,?,'user',?,'pending')`,
             [uuidv4(), tenantId, txId, responsibleId, responsibleName]);
 
           fileImported++;
-        });
+        }
       });
 
       totalImported += fileImported;
@@ -203,9 +203,9 @@ router.post('/statement', upload.array('files', 10), (req, res) => {
     } finally {
       try { fs.unlinkSync(file.path); } catch {}
     }
-  });
+  }
 
-  res.json({
+    res.json({
     imported: totalImported,
     skipped:  totalSkipped,
     errors,

@@ -5,7 +5,7 @@ const { query, queryOne, run, transaction } = require('../db/database');
 const tid = req => req.user.tenantId;
 
 // GET /api/reconciliation
-router.get('/', (req, res) => {
+router.get('/', async (req, res) => {
   const t = tid(req);
   const { status, from, to, limit=50, offset=0 } = req.query;
 
@@ -37,31 +37,31 @@ router.get('/', (req, res) => {
   sql += ` ORDER BY tx.date DESC, tx.created_at DESC LIMIT ? OFFSET ?`;
   params.push(Number(limit), Number(offset));
 
-  const rows  = query(sql, params);
-  const total = queryOne(`SELECT COUNT(*) as n FROM transactions tx
+  const rows  = await query(sql, params);
+  const total = await queryOne(`SELECT COUNT(*) as n FROM transactions tx
     LEFT JOIN reconciliation r ON r.transaction_id=tx.id
     WHERE tx.tenant_id=? AND tx.status!='debt' AND tx.is_merged=0`, [t]).n;
 
   // Para cada tx com installment_group, busca o grupo completo
   const groups = {};
-  rows.filter(r => r.installment_group).forEach(r => {
+  for (const r of rows.filter(r => r.installment_group)) {
     if (!groups[r.installment_group]) {
-      groups[r.installment_group] = query(
+      groups[r.installment_group] = await query(
         `SELECT id, date, amount, installment_number, status FROM transactions
-         WHERE tenant_id=? AND installment_group=? ORDER BY installment_number`,
+         WHERE tenant_id=$1 AND installment_group=$2 ORDER BY installment_number`,
         [t, r.installment_group]
       );
     }
     r.installment_siblings = groups[r.installment_group];
-  });
+  }
 
   res.json({ total, transactions: rows });
 });
 
 // GET /api/reconciliation/similar/:txId — busca transações similares para mesclar
-router.get('/similar/:txId', (req, res) => {
+router.get('/similar/:txId', async (req, res) => {
   const t = tid(req);
-  const tx = queryOne('SELECT * FROM transactions WHERE id=? AND tenant_id=?', [req.params.txId, t]);
+  const tx = await queryOne('SELECT * FROM transactions WHERE id=? AND tenant_id=?', [req.params.txId, t]);
   if (!tx) return res.status(404).json({ error: 'Transação não encontrada' });
 
   // Busca por descrição similar e valor próximo (±10%) dentro de 60 dias
@@ -71,7 +71,7 @@ router.get('/similar/:txId', (req, res) => {
   const dateFrom = new Date(tx.date); dateFrom.setDate(dateFrom.getDate()-30);
   const dateTo   = new Date(tx.date); dateTo.setDate(dateTo.getDate()+30);
 
-  const similar = query(`
+  const similar = await query(`
     SELECT tx2.id, tx2.date, tx2.description, tx2.amount, tx2.flow, tx2.status,
       tx2.source, a.name as account_name
     FROM transactions tx2
@@ -89,27 +89,27 @@ router.get('/similar/:txId', (req, res) => {
 });
 
 // POST /api/reconciliation/merge — mesclar transações duplicadas
-router.post('/merge', (req, res) => {
+router.post('/merge', async (req, res) => {
   const t = tid(req);
   const { keep_id, merge_ids } = req.body; // keep_id = transação principal, merge_ids = duplicadas
   if (!keep_id || !merge_ids?.length) return res.status(400).json({ error: 'keep_id e merge_ids obrigatórios' });
 
-  const keeper = queryOne('SELECT * FROM transactions WHERE id=? AND tenant_id=?', [keep_id, t]);
+  const keeper = await queryOne('SELECT * FROM transactions WHERE id=? AND tenant_id=?', [keep_id, t]);
   if (!keeper) return res.status(404).json({ error: 'Transação principal não encontrada' });
 
-  transaction(() => {
+  await transaction(async (client) => {
     // Marca as duplicatas como mescladas
-    merge_ids.forEach(id => {
-      run(`UPDATE transactions SET is_merged=1, merged_from=NULL WHERE id=? AND tenant_id=?`, [id, t]);
+    for (const id of merge_ids) {
+      await run(`UPDATE transactions SET is_merged=1, merged_from=NULL WHERE id=? AND tenant_id=?`, [id, t]);
       // Transfere reconciliação se existir
-      const r = queryOne('SELECT id FROM reconciliation WHERE transaction_id=?', [id]);
-      if (r) run('DELETE FROM reconciliation WHERE transaction_id=?', [id]);
-    });
+      const r = await queryOne('SELECT id FROM reconciliation WHERE transaction_id=?', [id]);
+      if (r) await run('DELETE FROM reconciliation WHERE transaction_id=?', [id]);
+  }
 
     // Registra quais foram mescladas no registro principal
-    const existing = queryOne('SELECT merged_from FROM transactions WHERE id=?', [keep_id]);
+    const existing = await queryOne('SELECT merged_from FROM transactions WHERE id=?', [keep_id]);
     const prev = existing?.merged_from ? JSON.parse(existing.merged_from) : [];
-    run('UPDATE transactions SET merged_from=? WHERE id=?',
+    await run('UPDATE transactions SET merged_from=? WHERE id=?',
       [JSON.stringify([...prev, ...merge_ids]), keep_id]);
   });
 
@@ -117,28 +117,28 @@ router.post('/merge', (req, res) => {
 });
 
 // POST /api/reconciliation/:txId — conciliar com parcelas
-router.post('/:txId', (req, res) => {
+router.post('/:txId', async (req, res) => {
   const t = tid(req);
   const { responsible_id, responsible_type, responsible_name, notes,
     installment_qty, installment_value, mark_group } = req.body;
 
-  const tx = queryOne('SELECT id,created_by,installment_group FROM transactions WHERE id=? AND tenant_id=?',
+  const tx = await queryOne('SELECT id,created_by,installment_group FROM transactions WHERE id=? AND tenant_id=?',
     [req.params.txId, t]);
   if (!tx) return res.status(404).json({ error: 'Transação não encontrada' });
 
   const respName = responsible_name ||
-    queryOne('SELECT name FROM users WHERE id=?', [responsible_id||tx.created_by])?.name || 'Titular';
+    await queryOne('SELECT name FROM users WHERE id=?', [responsible_id||tx.created_by])?.name || 'Titular';
 
   // Se informou parcelas e não tem grupo ainda, cria o grupo
   if (installment_qty && installment_qty > 1 && !tx.installment_group) {
     const groupId = `INST-${Date.now()}-${tx.id.slice(0,8)}`;
-    run('UPDATE transactions SET installment_group=?, installment_number=1, installment_total=?, installment_amount=? WHERE id=?',
+    await run('UPDATE transactions SET installment_group=?, installment_number=1, installment_total=?, installment_amount=? WHERE id=?',
       [groupId, installment_qty, installment_value||tx.amount, tx.id]);
 
     // Aplica o mesmo grupo a transações futuras similares do mesmo valor
     if (mark_group) {
       const desc_norm = (tx.description||'').toLowerCase().slice(0,30);
-      const futuras = query(`
+      const futuras = await query(`
         SELECT id FROM transactions
         WHERE tenant_id=? AND id!=? AND flow=? AND amount BETWEEN ? AND ?
           AND date > ? AND is_merged=0 AND installment_group IS NULL
@@ -147,25 +147,25 @@ router.post('/:txId', (req, res) => {
           (tx.amount||0)*0.97, (tx.amount||0)*1.03,
           tx.date, installment_qty - 1]);
 
-      futuras.forEach((f, idx) => {
-        run('UPDATE transactions SET installment_group=?, installment_number=?, installment_total=?, installment_amount=? WHERE id=?',
-          [groupId, idx+2, installment_qty, installment_value||tx.amount, f.id]);
-      });
+      for (let idx = 0; idx < futuras.length; idx++) {
+        await run('UPDATE transactions SET installment_group=?, installment_number=?, installment_total=?, installment_amount=? WHERE id=?',
+          [groupId, idx+2, installment_qty, installment_value||tx.amount, futuras[idx].id]);
+      }
     }
   }
 
   // Salva reconciliação
-  const existing = queryOne('SELECT id FROM reconciliation WHERE transaction_id=?', [req.params.txId]);
+  const existing = await queryOne('SELECT id FROM reconciliation WHERE transaction_id=?', [req.params.txId]);
   if (existing) {
-    run(`UPDATE reconciliation SET responsible_id=?,responsible_type=?,responsible_name=?,
-      notes=?,status='reconciled',reconciled_at=datetime('now'),
+    await run(`UPDATE reconciliation SET responsible_id=?,responsible_type=?,responsible_name=?,
+      notes=?,status='reconciled',reconciled_at=NOW(),
       installment_qty=?,installment_value=? WHERE id=?`,
       [responsible_id||null, responsible_type||'user', respName, notes||null,
        installment_qty||null, installment_value||null, existing.id]);
   } else {
-    run(`INSERT INTO reconciliation
+    await run(`INSERT INTO reconciliation
       (id,tenant_id,transaction_id,responsible_id,responsible_type,responsible_name,notes,status,reconciled_at,installment_qty,installment_value)
-      VALUES (?,?,?,?,?,?,?,'reconciled',datetime('now'),?,?)`,
+      VALUES (?,?,?,?,?,?,?,'reconciled',NOW(),?,?)`,
       [uuidv4(), t, req.params.txId, responsible_id||null, responsible_type||'user',
        respName, notes||null, installment_qty||null, installment_value||null]);
   }
@@ -174,16 +174,16 @@ router.post('/:txId', (req, res) => {
 });
 
 // GET /api/reconciliation/users
-router.get('/users', (req, res) => {
+router.get('/users', async (req, res) => {
   const t = tid(req);
-  const owner   = queryOne('SELECT u.id, u.name, u.email FROM users u JOIN tenants ten ON ten.owner_id=u.id WHERE ten.id=?', [t]);
-  const members = query(`SELECT u.id, u.name, u.email FROM tenant_members tm JOIN users u ON u.id=tm.user_id WHERE tm.tenant_id=? AND tm.status='active'`, [t]);
-  const entities= query(`SELECT id, label as name, 'entity' as type FROM entities WHERE tenant_id=?`, [t]);
+  const owner   = await queryOne('SELECT u.id, u.name, u.email FROM users u JOIN tenants ten ON ten.owner_id=u.id WHERE ten.id=?', [t]);
+  const members = await query(`SELECT u.id, u.name, u.email FROM tenant_members tm JOIN users u ON u.id=tm.user_id WHERE tm.tenant_id=? AND tm.status='active'`, [t]);
+  const entities= await query(`SELECT id, label as name, 'entity' as type FROM entities WHERE tenant_id=?`, [t]);
   res.json({ users: [owner, ...members].filter(Boolean), entities });
 });
 
 // GET /api/reconciliation/card-forecast — previsão de gastos por cartão (parcelas futuras)
-router.get('/card-forecast', (req, res) => {
+router.get('/card-forecast', async (req, res) => {
   const t = tid(req);
   const months = parseInt(req.query.months) || 6;
 
@@ -197,7 +197,7 @@ router.get('/card-forecast', (req, res) => {
     const monthEnd   = new Date(d.getFullYear(), d.getMonth()+1, 0).toISOString().slice(0,10);
 
     // Transações reais do mês (cartão de crédito)
-    const real = queryOne(`
+    const real = await queryOne(`
       SELECT COALESCE(SUM(tx.amount),0) as total, COUNT(*) as count
       FROM transactions tx
       JOIN accounts a ON a.id=tx.account_id
@@ -206,7 +206,7 @@ router.get('/card-forecast', (req, res) => {
     `, [t, monthStart, monthEnd]);
 
     // Parcelas conhecidas (installment_group) previstas para o mês
-    const parcelas = queryOne(`
+    const parcelas = await queryOne(`
       SELECT COALESCE(SUM(installment_amount),0) as total, COUNT(*) as count
       FROM transactions
       WHERE tenant_id=? AND installment_group IS NOT NULL
@@ -214,7 +214,7 @@ router.get('/card-forecast', (req, res) => {
     `, [t, monthStart, monthEnd]);
 
     // Contas a pagar (bills) do mês
-    const bills = queryOne(`
+    const bills = await queryOne(`
       SELECT COALESCE(SUM(amount),0) as total, COUNT(*) as count
       FROM bills
       WHERE tenant_id=? AND due_date BETWEEN ? AND ? AND status NOT IN('paid','debt')

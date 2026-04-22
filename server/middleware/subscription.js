@@ -6,11 +6,11 @@ const { getStatus } = require('../services/subscription');
  * Middleware que verifica se o tenant tem acesso ativo.
  * Deve ser aplicado APÓS verifyToken.
  */
-function checkSubscription(req, res, next) {
+async function checkSubscription(req, res, next) {
   const tenantId = req.user?.tenantId;
   if (!tenantId) return res.status(403).json({ error: 'Tenant não identificado' });
 
-  const status = getStatus(tenantId);
+  const status = await getStatus(tenantId);
 
   if (status.allowed) {
     req.subscription = status;

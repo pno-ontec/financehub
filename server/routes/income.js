@@ -7,8 +7,8 @@ const tid = req => req.user.tenantId;
 // ── CRUD Income Sources ───────────────────────────────────────────────────────
 
 // GET /api/income/sources
-router.get('/sources', (req, res) => {
-  res.json(query(`
+router.get('/sources', async (req, res) => {
+  res.json(await query(`
     SELECT is2.*, e.label as entity_label, e.type as entity_type
     FROM income_sources is2
     LEFT JOIN entities e ON e.id=is2.entity_id
@@ -17,7 +17,7 @@ router.get('/sources', (req, res) => {
 });
 
 // POST /api/income/sources
-router.post('/sources', (req, res) => {
+router.post('/sources', async (req, res) => {
   const t = tid(req);
   const {
     name, type, entity_id,
@@ -32,7 +32,7 @@ router.post('/sources', (req, res) => {
   if (!name || !type) return res.status(400).json({ error: 'name e type obrigatórios' });
 
   const id = uuidv4();
-  run(`INSERT INTO income_sources 
+  await run(`INSERT INTO income_sources 
     (id,tenant_id,entity_id,name,type,amount,
      gross_salary,inss_deduction,irrf_deduction,other_deductions,net_salary,
      benefit_health,benefit_food,benefit_transport,
@@ -46,11 +46,11 @@ router.post('/sources', (req, res) => {
      parseFloat(gross_revenue||0),tax_regime||null,parseFloat(das_amount||0),
      parseFloat(simples_rate||0),parseFloat(pro_labore||0),parseFloat(income_tax_pj||0)]);
 
-  res.status(201).json(queryOne('SELECT * FROM income_sources WHERE id=?', [id]));
+  res.status(201).json(await queryOne('SELECT * FROM income_sources WHERE id=?', [id]));
 });
 
 // PUT /api/income/sources/:id
-router.put('/sources/:id', (req, res) => {
+router.put('/sources/:id', async (req, res) => {
   const t = tid(req);
   const allowed = ['name','type','amount','gross_salary','inss_deduction','irrf_deduction',
     'other_deductions','net_salary','benefit_health','benefit_food','benefit_transport',
@@ -59,13 +59,13 @@ router.put('/sources/:id', (req, res) => {
   for(const k of allowed) if(req.body[k]!==undefined){sets.push(`${k}=?`);params.push(req.body[k]);}
   if(!sets.length) return res.status(400).json({error:'Nada para atualizar'});
   params.push(req.params.id,t);
-  run(`UPDATE income_sources SET ${sets.join(',')} WHERE id=? AND tenant_id=?`,params);
-  res.json(queryOne('SELECT * FROM income_sources WHERE id=?',[req.params.id]));
+  await run(`UPDATE income_sources SET ${sets.join(',')} WHERE id=? AND tenant_id=?`,params);
+  res.json(await queryOne('SELECT * FROM income_sources WHERE id=?',[req.params.id]));
 });
 
 // DELETE /api/income/sources/:id
-router.delete('/sources/:id', (req, res) => {
-  run('DELETE FROM income_sources WHERE id=? AND tenant_id=?', [req.params.id, tid(req)]);
+router.delete('/sources/:id', async (req, res) => {
+  await run('DELETE FROM income_sources WHERE id=? AND tenant_id=?', [req.params.id, tid(req)]);
   res.json({ message: 'Removido' });
 });
 

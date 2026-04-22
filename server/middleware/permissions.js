@@ -7,7 +7,7 @@ const { queryOne } = require('../db/database');
  *   - owner/admin do seu próprio tenant → acesso total
  *   - membro convidado de outro tenant → acesso limitado pelas permissions
  */
-function resolveContext(req, res, next) {
+async function resolveContext(req, res, next) {
   const userId   = req.user.id;
   const userRole = req.user.role;
 
@@ -24,7 +24,7 @@ function resolveContext(req, res, next) {
   }
 
   // Caso 2: é um tenant de terceiro — verifica membership
-  const member = queryOne(
+  const member = await queryOne(
     `SELECT * FROM tenant_members WHERE tenant_id=? AND user_id=? AND status='active'`,
     [requestedTenant, userId]
   );
@@ -36,10 +36,10 @@ function resolveContext(req, res, next) {
   // Verifica se o trial de CPF extra expirou
   if (member.trial_ends_at && new Date(member.trial_ends_at) < new Date()) {
     // Trial expirou — verifica se o titular pagou pelo CPF extra
-    const sub = queryOne('SELECT extra_cpf_count FROM subscriptions WHERE tenant_id=?', [requestedTenant]);
+    const sub = await queryOne('SELECT extra_cpf_count FROM subscriptions WHERE tenant_id=?', [requestedTenant]);
     const paidExtras = sub?.extra_cpf_count || 0;
-    const totalPaidMembers = queryOne(
-      `SELECT COUNT(*) as n FROM tenant_members WHERE tenant_id=? AND is_extra_cpf=1 AND status='active' AND (trial_ends_at IS NULL OR trial_ends_at < datetime('now'))`,
+    const totalPaidMembers = await queryOne(
+      `SELECT COUNT(*) as n FROM tenant_members WHERE tenant_id=? AND is_extra_cpf=1 AND status='active' AND (trial_ends_at IS NULL OR trial_ends_at < NOW())`,
       [requestedTenant]
     ).n;
     if (totalPaidMembers > paidExtras) {

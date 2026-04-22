@@ -5,7 +5,7 @@ const { query, queryOne, run, transaction } = require('../db/database');
 const tid = req => req.user.tenantId;
 
 // GET /api/bills — lista contas a pagar com filtros
-router.get('/', (req, res) => {
+router.get('/', async (req, res) => {
   const t = tid(req);
   const { status, from, to, filter } = req.query;
   const now   = new Date().toISOString().slice(0,10);
@@ -24,7 +24,7 @@ router.get('/', (req, res) => {
   const params = [t];
 
   // Auto-mark overdue
-  run(`UPDATE bills SET status='overdue' WHERE tenant_id=? AND due_date < ? AND status='pending'`, [t, now]);
+  await run(`UPDATE bills SET status='overdue' WHERE tenant_id=? AND due_date < ? AND status='pending'`, [t, now]);
 
   if (status)       { sql += ` AND b.status=?`;    params.push(status); }
   if (from)         { sql += ` AND b.due_date>=?`; params.push(from); }
@@ -36,8 +36,8 @@ router.get('/', (req, res) => {
 
   sql += ` ORDER BY b.due_date ASC, b.created_at DESC`;
 
-  const rows  = query(sql, params);
-  const totals = queryOne(`SELECT
+  const rows  = await query(sql, params);
+  const totals = await queryOne(`SELECT
     COALESCE(SUM(CASE WHEN status='pending'  THEN amount ELSE 0 END),0) as pending,
     COALESCE(SUM(CASE WHEN status='overdue'  THEN amount ELSE 0 END),0) as overdue,
     COALESCE(SUM(CASE WHEN status='paid'     THEN amount ELSE 0 END),0) as paid,
@@ -48,7 +48,7 @@ router.get('/', (req, res) => {
 });
 
 // POST /api/bills — criar conta a pagar (e parcelas se installments > 1)
-router.post('/', (req, res) => {
+router.post('/', async (req, res) => {
   const t = tid(req);
   const { description, amount, due_date, status, account_id, entity_id, category_id,
     recurrence, installments = 1, notes } = req.body;
@@ -58,13 +58,13 @@ router.post('/', (req, res) => {
   const n = parseInt(installments) || 1;
   const created = [];
 
-  transaction(() => {
+  await transaction(async (client) => {
     for (let i = 0; i < n; i++) {
       // Calcula data de vencimento de cada parcela
       const dueD = new Date(due_date);
       dueD.setMonth(dueD.getMonth() + i);
       const id = uuidv4();
-      run(`INSERT INTO bills
+      await run(`INSERT INTO bills
         (id,tenant_id,account_id,entity_id,category_id,description,amount,due_date,
          status,recurrence,installments,current_installment,notes)
         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
@@ -80,7 +80,7 @@ router.post('/', (req, res) => {
 });
 
 // PUT /api/bills/:id — editar
-router.put('/:id', (req, res) => {
+router.put('/:id', async (req, res) => {
   const t = tid(req);
   const allowed = ['description','amount','due_date','paid_date','status',
     'account_id','entity_id','category_id','recurrence','notes'];
@@ -90,33 +90,33 @@ router.put('/:id', (req, res) => {
 
   // Se marcando como dívida, chama módulo de dívidas
   if (req.body.status === 'debt') {
-    const bill = queryOne('SELECT * FROM bills WHERE id=? AND tenant_id=?', [req.params.id, t]);
+    const bill = await queryOne('SELECT * FROM bills WHERE id=? AND tenant_id=?', [req.params.id, t]);
     if (bill) {
-      run(`INSERT OR IGNORE INTO debts (id,tenant_id,entity_id,description,original_amount,remaining_amount,creditor,status)
+      await run(`INSERT INTO debts (id,tenant_id,entity_id,description,original_amount,remaining_amount,creditor,status)
         VALUES (?,?,?,?,?,?,'Conta a Pagar','active')`,
         [uuidv4(), t, bill.entity_id, bill.description, bill.amount, bill.amount]);
     }
   }
 
-  sets.push("updated_at=datetime('now')");
+  sets.push("updated_at=NOW()");
   params.push(req.params.id, t);
-  run(`UPDATE bills SET ${sets.join(',')} WHERE id=? AND tenant_id=?`, params);
-  res.json(queryOne(`SELECT b.*, a.name as account_name, e.label as entity_label
+  await run(`UPDATE bills SET ${sets.join(',')} WHERE id=? AND tenant_id=?`, params);
+  res.json(await queryOne(`SELECT b.*, a.name as account_name, e.label as entity_label
     FROM bills b LEFT JOIN accounts a ON a.id=b.account_id LEFT JOIN entities e ON e.id=b.entity_id
     WHERE b.id=?`, [req.params.id]));
 });
 
 // DELETE /api/bills/:id
-router.delete('/:id', (req, res) => {
-  run('DELETE FROM bills WHERE id=? AND tenant_id=?', [req.params.id, tid(req)]);
+router.delete('/:id', async (req, res) => {
+  await run('DELETE FROM bills WHERE id=? AND tenant_id=?', [req.params.id, tid(req)]);
   res.json({ message: 'Removida' });
 });
 
 // POST /api/bills/:id/pay — marcar como pago
-router.post('/:id/pay', (req, res) => {
+router.post('/:id/pay', async (req, res) => {
   const t = tid(req);
   const today = new Date().toISOString().slice(0,10);
-  run(`UPDATE bills SET status='paid', paid_date=?, updated_at=datetime('now') WHERE id=? AND tenant_id=?`,
+  await run(`UPDATE bills SET status='paid', paid_date=?, updated_at=NOW() WHERE id=? AND tenant_id=?`,
     [req.body.paid_date||today, req.params.id, t]);
   res.json({ ok: true });
 });
