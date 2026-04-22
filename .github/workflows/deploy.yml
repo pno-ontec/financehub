@@ -16,11 +16,21 @@ jobs:
       - name: Login no GHCR
         run: echo "${{ secrets.PAT_TOKEN }}" | docker login ghcr.io -u pno-ontec --password-stdin
 
-      - name: Build imagem
-        run: DOCKER_BUILDKIT=0 docker build -t ghcr.io/pno-ontec/financehub:latest .
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
 
-      - name: Push imagem
-        run: docker push ghcr.io/pno-ontec/financehub:latest
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build e Push ARM64
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          platforms: linux/arm64
+          tags: ghcr.io/pno-ontec/financehub:latest
+          no-cache: true
 
       - name: Deploy na VPS
         uses: appleboy/ssh-action@v1.0.3
@@ -33,5 +43,6 @@ jobs:
             echo "${{ secrets.PAT_TOKEN }}" | docker login ghcr.io -u pno-ontec --password-stdin
             docker compose pull app
             docker compose up -d --no-deps app nginx
-            sleep 10
+            sleep 15
             docker compose ps
+            docker compose logs app --tail=20
