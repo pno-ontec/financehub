@@ -1,0 +1,14 @@
+{
+  "name": "financehub",
+  "version": "1.0.0",
+  "description": "FinanceHub - Gestão financeira segura e consolidada",
+  "scripts": {
+    "start":   "cd server && node index.js",
+    "dev":     "cd server && npx nodemon index.js",
+    "setup":   "cd server && node scripts/setup.js",
+    "install-all": "cd server && npm install"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

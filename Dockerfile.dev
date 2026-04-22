@@ -1,0 +1,51 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# FinanceHub — Dockerfile.dev
+# Hot reload com nodemon + compilação de módulos nativos (better-sqlite3)
+# ─────────────────────────────────────────────────────────────────────────────
+
+FROM node:20-alpine
+
+# Ferramentas necessárias para compilar better-sqlite3 no Alpine
+RUN apk add --no-cache python3 make g++
+
+WORKDIR /app
+
+# Instala nodemon globalmente
+RUN npm install -g nodemon
+
+# Copia e instala dependências ANTES de montar volumes
+# (node_modules fica no container, isolado do Windows)
+COPY server/package.json ./server/
+RUN cd server && npm install
+
+# Copia código inicial (será sobrescrito pelos volumes em dev)
+COPY server/ ./server/
+COPY client/ ./client/
+
+# Cria diretórios que precisam existir
+RUN mkdir -p server/data server/uploads logs
+
+EXPOSE 3000
+
+# Gera .env automaticamente com chaves únicas se não existir
+ENTRYPOINT ["sh", "-c", "\
+  if [ ! -f /app/server/.env ]; then \
+    echo '⚙️  Primeira execução — gerando .env com chaves seguras...' && \
+    node -e \"\
+      const c = require('crypto'); \
+      const env = [ \
+        'NODE_ENV=development', \
+        'PORT=3000', \
+        'JWT_SECRET=' + c.randomBytes(64).toString('hex'), \
+        'SECRET_KEY=' + c.randomBytes(32).toString('hex'), \
+        'KEY_SALT='   + c.randomBytes(32).toString('hex'), \
+        'ALLOWED_ORIGINS=http://localhost:3000,http://127.0.0.1:3000' \
+      ].join('\\n') + '\\n'; \
+      require('fs').writeFileSync('/app/server/.env', env); \
+      console.log('✅  .env criado com chaves únicas!'); \
+    \"; \
+  else \
+    echo '✅  .env já existe, mantendo chaves atuais.'; \
+  fi && \
+  exec nodemon --watch /app/server --ext js,json /app/server/index.js \
+"]

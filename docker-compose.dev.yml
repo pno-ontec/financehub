@@ -1,0 +1,59 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# FinanceHub — docker-compose.dev.yml
+# Uso: docker compose -f docker-compose.dev.yml up --build
+#
+# Correções aplicadas:
+#   1. node_modules isolado no container (não sobrescrito pelo volume Windows)
+#   2. .env gerado automaticamente pelo ENTRYPOINT na 1ª execução
+#   3. env_file condicional removido (o app já lê o .env internamente)
+#   4. Volumes nomeados para banco e uploads persistirem entre restarts
+# ─────────────────────────────────────────────────────────────────────────────
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: financehub_dev
+    restart: unless-stopped
+
+    volumes:
+      - ./server:/app/server              # código fonte (hot reload)
+      - ./client:/app/client              # frontend (F5 para atualizar)
+      - financehub_data:/app/server/data          # banco SQLite persiste
+      - financehub_uploads:/app/server/uploads    # arquivos OFX/CSV persistem
+      # ↓ CRÍTICO: mantém o node_modules compilado no container
+      #   sem isso o Windows sobrescreve e o better-sqlite3 quebra
+      - financehub_node_modules:/app/server/node_modules
+
+    ports:
+      - "3000:3000"
+
+    environment:
+      - NODE_ENV=development
+      # ↓ Configure seu e-mail de administrador aqui
+      - ADMIN_EMAIL=${ADMIN_EMAIL:-admin@financehub.com.br}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      # O ENTRYPOINT gera o .env automaticamente usando essas variáveis
+
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/api/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+    networks:
+      - financehub_net
+
+networks:
+  financehub_net:
+    driver: bridge
+
+volumes:
+  financehub_data:
+    name: financehub_data
+  financehub_uploads:
+    name: financehub_uploads
+  financehub_node_modules:
+    name: financehub_node_modules

@@ -1,0 +1,727 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FinanceHub — Controle Financeiro Inteligente</title>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@400;500;600;700;800&family=DM+Mono:wght@300;400;500&family=Lato:wght@300;400;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#080b12;--surface:#0f1420;--surface2:#161d2e;--border:#1e2a40;
+    --accent:#00e5a0;--accent2:#3d8eff;--accent3:#f7c948;--danger:#ff4d6d;
+    --text:#f0f4ff;--text2:#9aaac8;--text3:#5a6a8a;
+    --grad:linear-gradient(135deg,#00e5a0,#3d8eff);
+    --grad2:linear-gradient(135deg,#f7c948,#ff6b35);
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  html{scroll-behavior:smooth;}
+  body{font-family:'Lato',sans-serif;background:var(--bg);color:var(--text);overflow-x:hidden;}
+  ::-webkit-scrollbar{width:4px;}
+  ::-webkit-scrollbar-track{background:var(--bg);}
+  ::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px;}
+
+  /* ── NAV ── */
+  nav{position:fixed;top:0;left:0;right:0;z-index:100;padding:0 40px;height:68px;display:flex;align-items:center;justify-content:space-between;background:rgba(8,11,18,.92);backdrop-filter:blur(24px);border-bottom:1px solid rgba(255,255,255,.06);transition:all .3s;}
+  .nav-logo{font-family:'Bricolage Grotesque',sans-serif;font-weight:800;font-size:22px;color:var(--accent);letter-spacing:-1px;}
+  .nav-logo span{color:var(--text2);font-weight:400;}
+  .nav-links{display:flex;gap:32px;align-items:center;}
+  .nav-links a{color:#c0cce8;text-decoration:none;font-size:14px;transition:color .2s;font-weight:500;}
+  .nav-links a:hover{color:#f0f4ff;}
+  .nav-cta{background:var(--accent);color:#000;font-weight:700;padding:9px 22px;border-radius:8px;text-decoration:none;font-size:14px;transition:all .2s;font-family:'Bricolage Grotesque',sans-serif;}
+  .nav-cta:hover{opacity:.88;transform:translateY(-1px);}
+
+  /* ── HERO ── */
+  .hero{min-height:100vh;display:flex;align-items:center;padding:100px 40px 80px;position:relative;overflow:hidden;}
+  .hero-bg{position:absolute;inset:0;background:
+    radial-gradient(ellipse 900px 600px at 15% 60%, rgba(0,229,160,.07) 0%, transparent 55%),
+    radial-gradient(ellipse 700px 500px at 85% 25%, rgba(61,142,255,.06) 0%, transparent 55%);
+  }
+  .hero-grid{position:absolute;inset:0;background-image:linear-gradient(rgba(255,255,255,.025) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.025) 1px,transparent 1px);background-size:60px 60px;mask-image:radial-gradient(ellipse 80% 60% at 50% 0%,black 0%,transparent 100%);}
+  .hero-inner{position:relative;max-width:1200px;margin:0 auto;width:100%;display:grid;grid-template-columns:1fr 1fr;gap:80px;align-items:center;}
+  .hero-tag{display:inline-flex;align-items:center;gap:8px;background:rgba(0,229,160,.1);border:1px solid rgba(0,229,160,.3);border-radius:20px;padding:6px 16px;font-size:12px;color:#00e5a0;font-family:'DM Mono',monospace;margin-bottom:24px;font-weight:500;}
+  .hero-tag::before{content:'';width:6px;height:6px;border-radius:50%;background:var(--accent);animation:pulse 2s infinite;}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+  h1{font-family:'Bricolage Grotesque',sans-serif;font-size:clamp(42px,5vw,68px);font-weight:800;line-height:1.05;letter-spacing:-2px;margin-bottom:24px;}
+  h1 .grad{background:var(--grad);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
+  .hero-sub{font-size:18px;color:var(--text2);line-height:1.7;max-width:480px;margin-bottom:40px;font-weight:300;letter-spacing:.01em;}
+  .hero-actions{display:flex;gap:14px;flex-wrap:wrap;}
+  .btn-hero{padding:14px 28px;border-radius:10px;font-weight:700;font-size:15px;cursor:pointer;transition:all .2s;text-decoration:none;display:inline-flex;align-items:center;gap:8px;font-family:'Bricolage Grotesque',sans-serif;}
+  .btn-hero.primary{background:var(--accent);color:#000;}
+  .btn-hero.primary:hover{transform:translateY(-2px);box-shadow:0 12px 40px rgba(0,229,160,.3);}
+  .btn-hero.secondary{background:transparent;color:var(--text);border:1px solid var(--border);}
+  .btn-hero.secondary:hover{border-color:var(--text2);}
+  .hero-stats{display:flex;gap:32px;margin-top:48px;}
+  .stat{text-align:center;}
+  .stat-val{font-family:'Bricolage Grotesque',sans-serif;font-weight:800;font-size:28px;color:var(--accent);}
+  .stat-lab{font-size:12px;color:#7a8caa;font-family:'DM Mono',monospace;margin-top:2px;}
+
+  /* ── DASHBOARD PREVIEW ── */
+  .hero-visual{position:relative;}
+  .dash-preview{background:#10162a;border:1px solid rgba(255,255,255,.1);border-radius:16px;padding:20px;box-shadow:0 40px 120px rgba(0,0,0,.7);transform:perspective(1000px) rotateY(-5deg) rotateX(2deg);transition:transform .6s;}
+  .dash-preview:hover{transform:perspective(1000px) rotateY(0) rotateX(0);}
+  .dash-topbar{display:flex;align-items:center;gap:8px;margin-bottom:16px;}
+  .dash-dot{width:10px;height:10px;border-radius:50%;}
+  .dash-cards{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;}
+  .dash-card{background:#1a2236;border:1px solid rgba(255,255,255,.08);border-radius:8px;padding:12px;}
+  .dash-card-label{font-size:9px;color:var(--text3);font-family:'DM Mono',monospace;margin-bottom:6px;text-transform:uppercase;}
+  .dash-card-val{font-family:'Bricolage Grotesque',sans-serif;font-weight:700;font-size:18px;}
+  .dash-bar-wrap{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:12px;}
+  .dash-bars{display:flex;gap:4px;align-items:flex-end;height:60px;}
+  .dash-bar{flex:1;border-radius:3px 3px 0 0;min-height:4px;}
+  .glow-badge{position:absolute;top:-12px;right:-12px;background:var(--grad);border-radius:10px;padding:8px 14px;font-size:12px;font-weight:700;color:#000;font-family:'DM Mono',monospace;box-shadow:0 8px 24px rgba(0,229,160,.4);animation:float 3s ease-in-out infinite;}
+  @keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
+
+  /* ── SECTIONS ── */
+  section{padding:100px 40px;max-width:1200px;margin:0 auto;}
+  .section-tag{font-family:'DM Mono',monospace;font-size:11px;color:#00e5a0;text-transform:uppercase;letter-spacing:3px;margin-bottom:16px;font-weight:500;}
+  h2{font-family:'Bricolage Grotesque',sans-serif;font-size:clamp(32px,4vw,52px);font-weight:800;letter-spacing:-1.5px;line-height:1.1;margin-bottom:20px;}
+  h2 .grad{background:var(--grad);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
+  .section-sub{font-size:17px;color:var(--text2);max-width:560px;line-height:1.7;margin-bottom:60px;font-weight:300;}
+
+  /* ── FEATURES GRID ── */
+  .features-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:20px;}
+  .feature-card{background:#0f1420;border:1px solid rgba(255,255,255,.06);border-radius:16px;padding:28px;position:relative;overflow:hidden;transition:all .3s;}
+  .feature-card::before{content:'';position:absolute;inset:0;background:linear-gradient(135deg,rgba(0,229,160,.03),transparent);opacity:0;transition:opacity .3s;}
+  .feature-card:hover{border-color:rgba(0,229,160,.4);transform:translateY(-4px);box-shadow:0 16px 48px rgba(0,0,0,.3);}
+  .feature-card:hover::before{opacity:1;}
+  .feature-icon{font-size:32px;margin-bottom:16px;}
+  .feature-title{font-family:'Bricolage Grotesque',sans-serif;font-weight:700;font-size:18px;margin-bottom:10px;color:#f0f4ff;}
+  .feature-desc{font-size:14px;color:#9aaac8;line-height:1.7;font-weight:300;}
+
+  /* ── PLANS ── */
+  .plans-wrap{padding:100px 40px;background:#0c1119;border-top:1px solid rgba(255,255,255,.05);border-bottom:1px solid rgba(255,255,255,.05);}
+  .plans-inner{max-width:1200px;margin:0 auto;}
+  .plans-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:20px;margin-top:60px;}
+  .plan-card{background:#0a0f1a;border:1px solid rgba(255,255,255,.07);border-radius:20px;padding:32px 24px;position:relative;transition:all .3s;}
+  .plan-card.featured{border-color:rgba(0,229,160,.5);background:linear-gradient(160deg,rgba(0,229,160,.06),#0a0f1a);box-shadow:0 0 40px rgba(0,229,160,.08);}
+  .plan-card:hover{transform:translateY(-6px);}
+  .plan-card:hover:not(.featured){border-color:var(--border);}
+  .plan-badge{position:absolute;top:-12px;left:50%;transform:translateX(-50%);background:var(--accent);color:#000;font-size:10px;font-weight:700;padding:4px 16px;border-radius:10px;white-space:nowrap;font-family:'DM Mono',monospace;}
+  .plan-name{font-family:'DM Mono',monospace;font-size:11px;text-transform:uppercase;letter-spacing:2px;color:#7a8caa;margin-bottom:12px;font-weight:500;}
+  .plan-price{font-family:'Bricolage Grotesque',sans-serif;font-weight:800;font-size:44px;color:var(--accent);line-height:1;}
+  .plan-period{font-size:14px;color:#7a8caa;margin-bottom:8px;}
+  .plan-cpfs{font-size:13px;color:#9aaac8;margin-bottom:24px;padding-bottom:24px;border-bottom:1px solid var(--border);font-weight:400;}
+  .plan-features{list-style:none;display:flex;flex-direction:column;gap:10px;margin-bottom:28px;}
+  .plan-features li{font-size:13px;color:#b0bdd8;display:flex;gap:10px;align-items:flex-start;}
+  .plan-features li::before{content:'✓';color:var(--accent);font-weight:700;flex-shrink:0;margin-top:1px;}
+  .plan-btn{display:block;width:100%;padding:13px;background:var(--accent);color:#000;font-weight:700;font-size:14px;border:none;border-radius:10px;cursor:pointer;font-family:'Bricolage Grotesque',sans-serif;transition:all .2s;text-align:center;text-decoration:none;}
+  .plan-btn:hover{opacity:.85;transform:translateY(-1px);}
+  .plan-btn.outline{background:transparent;color:var(--text);border:1px solid var(--border);}
+  .plan-btn.outline:hover{border-color:var(--accent);color:var(--accent);}
+
+  /* ── HOW IT WORKS ── */
+  .steps{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:40px;margin-top:60px;}
+  .step{text-align:center;}
+  .step-num{width:52px;height:52px;border-radius:50%;background:var(--grad);display:flex;align-items:center;justify-content:center;font-family:'Bricolage Grotesque',sans-serif;font-weight:800;font-size:20px;color:#000;margin:0 auto 16px;}
+  .step-title{font-family:'Bricolage Grotesque',sans-serif;font-weight:700;font-size:17px;margin-bottom:8px;}
+  .step-desc{font-size:13px;color:#9aaac8;line-height:1.7;font-weight:300;}
+
+  /* ── TICKER ── */
+  .ticker-wrap{background:var(--surface);border-top:1px solid var(--border);border-bottom:1px solid var(--border);padding:0;overflow:hidden;position:relative;}
+  .ticker-inner{display:flex;gap:0;animation:ticker 40s linear infinite;white-space:nowrap;}
+  .ticker-inner:hover{animation-play-state:paused;}
+  .ticker-item{display:inline-flex;align-items:center;gap:8px;padding:10px 32px;font-size:13px;font-family:'DM Mono',monospace;border-right:1px solid var(--border);}
+  .ticker-name{color:var(--text3);}
+  .ticker-price{color:var(--text);font-weight:500;}
+  .ticker-change.up{color:var(--accent);}
+  .ticker-change.down{color:var(--danger);}
+  @keyframes ticker{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+
+  /* ── LOGIN SECTION ── */
+  .login-section{padding:80px 40px;background:#0c1119;border-top:1px solid rgba(255,255,255,.05);}
+  .login-inner{max-width:480px;margin:0 auto;text-align:center;}
+  .login-box{background:#0d1220;border:1px solid rgba(255,255,255,.08);border-radius:20px;padding:40px;margin-top:40px;text-align:left;box-shadow:0 20px 60px rgba(0,0,0,.4);}
+  .login-tabs{display:flex;background:#1a2236;border-radius:10px;padding:4px;margin-bottom:28px;}
+  .login-tab{flex:1;padding:10px;text-align:center;border-radius:8px;cursor:pointer;font-size:14px;font-weight:600;color:#7a8caa;transition:all .2s;}
+  .login-tab.active{background:#0d1220;color:#f0f4ff;box-shadow:0 2px 8px rgba(0,0,0,.4);}
+  .form-group{display:flex;flex-direction:column;gap:6px;margin-bottom:16px;}
+  .form-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#7a8caa;font-family:'DM Mono',monospace;}
+  .form-input{background:#1a2236;border:1px solid rgba(255,255,255,.1);color:#f0f4ff;border-radius:8px;padding:11px 14px;font-size:14px;outline:none;width:100%;transition:border-color .2s;}
+  .form-input::placeholder{color:#5a6a8a;}
+  .form-input:focus{border-color:var(--accent);}
+  .btn-login{width:100%;padding:13px;background:var(--accent);color:#000;border:none;border-radius:10px;font-weight:700;font-size:15px;cursor:pointer;font-family:'Bricolage Grotesque',sans-serif;transition:all .2s;display:flex;align-items:center;justify-content:center;gap:8px;}
+  .btn-login:hover{opacity:.88;}
+  .btn-login:disabled{opacity:.5;cursor:not-allowed;}
+  .form-error{color:var(--danger);font-size:12px;display:none;margin-top:4px;}
+  .spinner{width:16px;height:16px;border:2px solid rgba(0,0,0,.3);border-top-color:#000;border-radius:50%;animation:spin .7s linear infinite;display:none;}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .pwd-strength{height:3px;border-radius:2px;margin-top:6px;transition:all .3s;}
+
+  /* ── FOOTER ── */
+  footer{padding:40px;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:16px;max-width:100%;}
+  .footer-logo{font-family:'Bricolage Grotesque',sans-serif;font-weight:800;font-size:18px;color:var(--accent);}
+  .footer-links{display:flex;gap:24px;}
+  .footer-links a{color:#7a8caa;text-decoration:none;font-size:13px;transition:color .2s;}
+  .footer-links a:hover{color:#c0cce8;}
+  .footer-copy{color:#5a6a8a;font-size:12px;font-family:'DM Mono',monospace;}
+
+  /* ── TESTIMONIALS ── */
+  .testimonials{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:20px;margin-top:60px;}
+  .testimonial{background:#0f1420;border:1px solid rgba(255,255,255,.06);border-radius:16px;padding:24px;}
+  .testimonial-text{font-size:14px;color:#b8c5dc;line-height:1.8;margin-bottom:20px;font-style:italic;}
+  .testimonial-author{display:flex;align-items:center;gap:12px;}
+  .testimonial-avatar{width:40px;height:40px;border-radius:50%;background:var(--grad);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:16px;color:#000;}
+  .testimonial-name{font-weight:700;font-size:13px;}
+  .testimonial-role{font-size:11px;color:var(--text3);}
+
+  /* ── COMPARISON ── */
+  .comparison-table{width:100%;border-collapse:collapse;margin-top:40px;}
+  .comparison-table th,.comparison-table td{padding:14px 20px;text-align:left;border-bottom:1px solid rgba(255,255,255,.05);font-size:13px;}
+  .comparison-table th{font-family:'DM Mono',monospace;font-size:11px;text-transform:uppercase;letter-spacing:1px;color:#7a8caa;}
+  .comparison-table tr:hover td{background:rgba(0,229,160,.02);}
+  .check-yes{color:var(--accent);font-weight:700;}
+  .check-no{color:var(--text3);}
+
+  /* ── RESPONSIVE ── */
+  @media(max-width:768px){
+    nav{padding:0 20px;}
+    .nav-links{display:none;}
+    .hero-inner{grid-template-columns:1fr;}
+    .hero-visual{display:none;}
+    section{padding:60px 20px;}
+    .plans-wrap{padding:60px 20px;}
+    .login-section{padding:60px 20px;}
+    footer{flex-direction:column;text-align:center;}
+    .hero-actions{flex-direction:column;}
+    .btn-hero{justify-content:center;}
+  }
+
+  /* Animate on scroll */
+  .fade-in{opacity:0;transform:translateY(20px);transition:opacity .6s,transform .6s;}
+  .fade-in.visible{opacity:1;transform:translateY(0);}
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <div class="nav-logo">Finance<span>Hub</span></div>
+  <div class="nav-links">
+    <a href="#features">Recursos</a>
+    <a href="#planos">Planos</a>
+    <a href="#como-funciona">Como funciona</a>
+    <a href="#login">Entrar</a>
+  </div>
+  <a href="#login" class="nav-cta">Começar grátis →</a>
+</nav>
+
+<!-- HERO -->
+<div class="hero">
+  <div class="hero-bg"></div>
+  <div class="hero-grid"></div>
+  <div class="hero-inner">
+    <div>
+      <div class="hero-tag">🚀 Trial gratuito por 15 dias</div>
+      <h1>Controle financeiro <span class="grad">inteligente</span> para você e sua família</h1>
+      <p class="hero-sub">Importe extratos, analise gastos, detecte dívidas e planeje sua vida financeira com IA. Um app, todos os seus CPFs e CNPJs.</p>
+      <div class="hero-actions">
+        <a href="#login" class="btn-hero primary">Começar grátis ↗</a>
+        <a href="#planos" class="btn-hero secondary">Ver planos</a>
+      </div>
+      <div class="hero-stats">
+        <div class="stat"><div class="stat-val">100%</div><div class="stat-lab">Seus dados</div></div>
+        <div class="stat"><div class="stat-val">15d</div><div class="stat-lab">Trial grátis</div></div>
+        <div class="stat"><div class="stat-val">R$29</div><div class="stat-lab">A partir de</div></div>
+      </div>
+    </div>
+    <div class="hero-visual">
+      <div class="glow-badge">↑ 23% poupança</div>
+      <div class="dash-preview">
+        <div class="dash-topbar">
+          <div class="dash-dot" style="background:#ff4d6d"></div>
+          <div class="dash-dot" style="background:#f7c948;margin-left:4px"></div>
+          <div class="dash-dot" style="background:#00e5a0;margin-left:4px"></div>
+          <div style="flex:1;background:var(--surface2);border-radius:4px;height:16px;margin-left:12px"></div>
+        </div>
+        <div class="dash-cards">
+          <div class="dash-card"><div class="dash-card-label">Receitas</div><div class="dash-card-val" style="color:#00e5a0">R$8.400</div></div>
+          <div class="dash-card"><div class="dash-card-label">Despesas</div><div class="dash-card-val" style="color:#ff4d6d">R$6.200</div></div>
+          <div class="dash-card"><div class="dash-card-label">A Pagar</div><div class="dash-card-val" style="color:#f7c948">R$1.100</div></div>
+          <div class="dash-card"><div class="dash-card-label">Saldo</div><div class="dash-card-val" style="color:#0059ff">R$2.200</div></div>
+        </div>
+        <div class="dash-bar-wrap">
+          <div style="font-size:9px;color:var(--text3);font-family:'DM Mono',monospace;margin-bottom:8px">FLUXO MENSAL</div>
+          <div class="dash-bars">
+            <div class="dash-bar" style="height:60%;background:#00e5a020;border:1px solid #00e5a040"></div>
+            <div class="dash-bar" style="height:80%;background:#00e5a0"></div>
+            <div class="dash-bar" style="height:50%;background:#00e5a020;border:1px solid #00e5a040"></div>
+            <div class="dash-bar" style="height:90%;background:#00e5a0"></div>
+            <div class="dash-bar" style="height:70%;background:#00e5a020;border:1px solid #00e5a040"></div>
+            <div class="dash-bar" style="height:100%;background:#00e5a0"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- TICKER cotações -->
+<div class="ticker-wrap" id="tickerSection">
+  <div class="ticker-inner" id="tickerInner">
+    <div class="ticker-item"><span class="ticker-name">USD/BRL</span><span class="ticker-price" id="tk-usd">—</span><span class="ticker-change up" id="tk-usd-chg">—</span></div>
+    <div class="ticker-item"><span class="ticker-name">EUR/BRL</span><span class="ticker-price" id="tk-eur">—</span><span class="ticker-change up" id="tk-eur-chg">—</span></div>
+    <div class="ticker-item"><span class="ticker-name">BTC/USD</span><span class="ticker-price" id="tk-btc">—</span><span class="ticker-change up" id="tk-btc-chg">—</span></div>
+    <div class="ticker-item"><span class="ticker-name">ETH/USD</span><span class="ticker-price" id="tk-eth">—</span><span class="ticker-change up" id="tk-eth-chg">—</span></div>
+    <div class="ticker-item"><span class="ticker-name">SOL/USD</span><span class="ticker-price" id="tk-sol">—</span><span class="ticker-change up" id="tk-sol-chg">—</span></div>
+    <div class="ticker-item"><span class="ticker-name">IBOVESPA</span><span class="ticker-price" id="tk-ibov">—</span><span class="ticker-change up" id="tk-ibov-chg">—</span></div>
+    <!-- duplicado para loop -->
+    <div class="ticker-item"><span class="ticker-name">USD/BRL</span><span class="ticker-price" id="tk-usd2">—</span><span class="ticker-change up" id="tk-usd-chg2">—</span></div>
+    <div class="ticker-item"><span class="ticker-name">EUR/BRL</span><span class="ticker-price" id="tk-eur2">—</span><span class="ticker-change up" id="tk-eur-chg2">—</span></div>
+    <div class="ticker-item"><span class="ticker-name">BTC/USD</span><span class="ticker-price" id="tk-btc2">—</span><span class="ticker-change up" id="tk-btc-chg2">—</span></div>
+    <div class="ticker-item"><span class="ticker-name">ETH/USD</span><span class="ticker-price" id="tk-eth2">—</span><span class="ticker-change up" id="tk-eth-chg2">—</span></div>
+    <div class="ticker-item"><span class="ticker-name">SOL/USD</span><span class="ticker-price" id="tk-sol2">—</span><span class="ticker-change up" id="tk-sol-chg2">—</span></div>
+    <div class="ticker-item"><span class="ticker-name">IBOVESPA</span><span class="ticker-price" id="tk-ibov2">—</span><span class="ticker-change up" id="tk-ibov-chg2">—</span></div>
+  </div>
+</div>
+
+<!-- FEATURES -->
+<section id="features" class="fade-in">
+  <div class="section-tag">Funcionalidades</div>
+  <h2>Tudo que suas finanças <span class="grad">precisam</span></h2>
+  <p class="section-sub">De importação de extratos a análise de risco de endividamento — tudo em um só lugar, com segurança total dos seus dados.</p>
+  <div class="features-grid">
+    <div class="feature-card fade-in">
+      <div class="feature-icon">📊</div>
+      <div class="feature-title">Dashboard Multi-banco</div>
+      <div class="feature-desc">Visualize todas as suas contas, cartões e investimentos em uma única tela. Importe extratos OFX e CSV de qualquer banco brasileiro.</div>
+    </div>
+    <div class="feature-card fade-in">
+      <div class="feature-icon">👨‍👩‍👧‍👦</div>
+      <div class="feature-title">Controle Familiar</div>
+      <div class="feature-desc">Adicione familiares com permissões individuais. Cada CPF tem sua visão, mas o titular vê tudo consolidado.</div>
+    </div>
+    <div class="feature-card fade-in">
+      <div class="feature-icon">💳</div>
+      <div class="feature-title">Análise de Cartão IA</div>
+      <div class="feature-desc">Detecta recorrências automáticas, calcula risco de endividamento e alerta quando o uso do limite é crítico.</div>
+    </div>
+    <div class="feature-card fade-in">
+      <div class="feature-icon">🏢</div>
+      <div class="feature-title">Multi-CNPJ</div>
+      <div class="feature-desc">Controle PJ e PF no mesmo app. MEI, Simples Nacional, CLT — cálculo automático de impostos e deduções.</div>
+    </div>
+    <div class="feature-card fade-in">
+      <div class="feature-icon">📈</div>
+      <div class="feature-title">Score de Saúde</div>
+      <div class="feature-desc">Score de 0 a 100 baseado em taxa de poupança, atrasos, parcelamentos e tendências dos últimos meses.</div>
+    </div>
+    <div class="feature-card fade-in">
+      <div class="feature-icon">💸</div>
+      <div class="feature-title">Módulo de Dívidas</div>
+      <div class="feature-desc">Marque lançamentos como dívidas, simule 3 estratégias de quitação baseadas na sua renda e programe pagamentos.</div>
+    </div>
+    <div class="feature-card fade-in">
+      <div class="feature-icon">🔄</div>
+      <div class="feature-title">Parcelamentos</div>
+      <div class="feature-desc">Cadastre financiamentos com tabela Price, cálculo de juros compostos e acompanhe parcela a parcela.</div>
+    </div>
+    <div class="feature-card fade-in">
+      <div class="feature-icon">📱</div>
+      <div class="feature-title">App Mobile</div>
+      <div class="feature-desc">Versão mobile otimizada para acompanhamento e lançamento rápido de gastos. Leia comprovantes por foto.</div>
+    </div>
+    <div class="feature-card fade-in">
+      <div class="feature-icon">🔒</div>
+      <div class="feature-title">100% Seguro</div>
+      <div class="feature-desc">Seus dados ficam no seu servidor. JWT + refresh tokens, AES-256, HTTPS obrigatório. Somente leitura — nunca movimenta seu dinheiro.</div>
+    </div>
+  </div>
+</section>
+
+<!-- COMO FUNCIONA -->
+<section id="como-funciona" class="fade-in" style="background:#0f1420;border:1px solid rgba(255,255,255,.06);border-radius:24px;margin:0 40px;padding:80px 60px;">
+  <div class="section-tag">Como funciona</div>
+  <h2>Comece em <span class="grad">3 minutos</span></h2>
+  <p class="section-sub">Sem instalação, sem burocracia. Acesse pelo navegador ou app.</p>
+  <div class="steps">
+    <div class="step fade-in"><div class="step-num">1</div><div class="step-title">Crie sua conta</div><div class="step-desc">15 dias grátis. Nenhum cartão de crédito necessário para começar.</div></div>
+    <div class="step fade-in"><div class="step-num">2</div><div class="step-title">Importe seus extratos</div><div class="step-desc">OFX ou CSV de qualquer banco. Ou lance manualmente. Tudo em segundos.</div></div>
+    <div class="step fade-in"><div class="step-num">3</div><div class="step-title">Convide a família</div><div class="step-desc">Adicione CPFs com permissões personalizadas. 30 dias grátis para cada membro.</div></div>
+    <div class="step fade-in"><div class="step-num">4</div><div class="step-title">Tome decisões</div><div class="step-desc">Score de saúde, análise de cartão e simulações de quitação de dívidas.</div></div>
+  </div>
+</section>
+
+<!-- PLANS -->
+<div class="plans-wrap" id="planos">
+  <div class="plans-inner">
+    <div class="section-tag">Planos</div>
+    <h2>Preço <span class="grad">transparente</span></h2>
+    <p class="section-sub">Sem letras miúdas. Cancele quando quiser. CPFs extras com 30 dias de trial gratuito cada.</p>
+    <div class="plans-grid">
+      <div class="plan-card fade-in">
+        <div class="plan-name">Individual</div>
+        <div class="plan-price">R$29</div>
+        <div class="plan-period">/mês</div>
+        <div class="plan-cpfs">1 CPF titular · Extras: +R$5/mês cada</div>
+        <ul class="plan-features">
+          <li>Dashboard multi-banco</li>
+          <li>Importação OFX/CSV ilimitada</li>
+          <li>Parcelamentos e financiamentos</li>
+          <li>Análise de cartão</li>
+          <li>Score de saúde financeira</li>
+        </ul>
+        <a href="#login" class="plan-btn outline">Começar grátis</a>
+      </div>
+      <div class="plan-card fade-in">
+        <div class="plan-name">Família S</div>
+        <div class="plan-price">R$49</div>
+        <div class="plan-period">/mês</div>
+        <div class="plan-cpfs">3 CPFs incluídos · Extras: +R$4/mês</div>
+        <ul class="plan-features">
+          <li>Tudo do Individual</li>
+          <li>3 membros com permissões</li>
+          <li>Visão consolidada da família</li>
+          <li>Controle por CPF individual</li>
+          <li>Relatórios familiares</li>
+        </ul>
+        <a href="#login" class="plan-btn outline">Começar grátis</a>
+      </div>
+      <div class="plan-card featured fade-in">
+        <div class="plan-badge">⭐ MAIS POPULAR</div>
+        <div class="plan-name">Família M</div>
+        <div class="plan-price">R$79</div>
+        <div class="plan-period">/mês</div>
+        <div class="plan-cpfs">6 CPFs incluídos · Extras: +R$3,50/mês</div>
+        <ul class="plan-features">
+          <li>Tudo do Família S</li>
+          <li>6 membros incluídos</li>
+          <li>Multi-CNPJ ilimitado</li>
+          <li>Análise por CPF/CNPJ</li>
+          <li>Módulo dívidas + simulador</li>
+          <li>Conciliação de lançamentos</li>
+        </ul>
+        <a href="#login" class="plan-btn">Começar grátis</a>
+      </div>
+      <div class="plan-card fade-in">
+        <div class="plan-name">Família L</div>
+        <div class="plan-price">R$129</div>
+        <div class="plan-period">/mês</div>
+        <div class="plan-cpfs">12 CPFs incluídos · Extras: +R$3/mês</div>
+        <ul class="plan-features">
+          <li>Tudo do Família M</li>
+          <li>12 membros incluídos</li>
+          <li>Ideal para empresas familiares</li>
+          <li>Score por membro</li>
+          <li>API de integração (em breve)</li>
+          <li>Suporte prioritário</li>
+        </ul>
+        <a href="#login" class="plan-btn outline">Começar grátis</a>
+      </div>
+    </div>
+    <p style="text-align:center;margin-top:24px;font-size:13px;color:#7a8caa">Todos os planos com <strong style="color:#c0cce8">15 dias de trial gratuito</strong> · Pagamento via PIX · Cancele a qualquer momento</p>
+    <p style="text-align:center;margin-top:8px;font-size:13px;color:#7a8caa">🎁 <strong style="color:#00e5a0">Indique um amigo e ambos ganham 1 mês grátis.</strong> Plano anual? Ganhe 10% de crédito por indicação (até 50%).</p>
+  </div>
+</div>
+
+<!-- TESTIMONIALS -->
+<section class="fade-in">
+  <div class="section-tag">Depoimentos</div>
+  <h2>Quem usa, <span class="grad">recomenda</span></h2>
+  <div class="testimonials">
+    <div class="testimonial fade-in">
+      <p class="testimonial-text">"Finalmente consegui ver meu dinheiro todo em um lugar só. Importei os extratos de 4 bancos e 2 cartões em 10 minutos. O score de saúde me ajudou a entender onde estava errando."</p>
+      <div class="testimonial-author"><div class="testimonial-avatar">M</div><div><div class="testimonial-name">Mariana S.</div><div class="testimonial-role">Analista de TI · Plano Família M</div></div></div>
+    </div>
+    <div class="testimonial fade-in">
+      <p class="testimonial-text">"Uso para controlar PJ e PF juntos. O cálculo automático de DAS e Simples Nacional já me poupou horas toda semana. O módulo de dívidas foi o que me fez assinar."</p>
+      <div class="testimonial-author"><div class="testimonial-avatar">R</div><div><div class="testimonial-name">Rafael C.</div><div class="testimonial-role">Desenvolvedor · MEI · Plano Individual</div></div></div>
+    </div>
+    <div class="testimonial fade-in">
+      <p class="testimonial-text">"Coloquei eu, minha esposa e minha mãe no mesmo plano. Cada um vê só o que deve ver. O controle familiar é exatamente o que eu precisava há anos."</p>
+      <div class="testimonial-author"><div class="testimonial-avatar">A</div><div><div class="testimonial-name">André P.</div><div class="testimonial-role">Empresário · Plano Família L</div></div></div>
+    </div>
+  </div>
+</section>
+
+<!-- LOGIN SECTION -->
+<div class="login-section" id="login" style="background:#0c1119;">
+  <div class="login-inner">
+    <div class="section-tag" style="text-align:center">Acesso</div>
+    <h2 style="text-align:center">Entre ou <span class="grad">comece</span> agora</h2>
+    <p style="color:var(--text2);font-size:15px;text-align:center">15 dias grátis. Sem cartão de crédito.</p>
+    <div class="login-box">
+      <!-- Campos falsos para enganar o autocomplete do browser -->
+      <input type="text"     style="display:none" aria-hidden="true" tabindex="-1">
+      <input type="password" style="display:none" aria-hidden="true" tabindex="-1">
+      <div class="login-tabs">
+        <div class="login-tab active" id="tabLogin" onclick="switchTab('login')">Entrar</div>
+        <div class="login-tab" id="tabRegister" onclick="switchTab('register')">Criar Conta</div>
+      </div>
+
+      <!-- Login form -->
+      <div id="formLogin">
+        <div class="form-group">
+          <label class="form-label">E-mail, CPF ou Login</label>
+          <input class="form-input" id="loginIdentifier" type="text"
+            placeholder="seu@email.com ou CPF ou login"
+            autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
+            name="fh_identifier_login">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Senha</label>
+          <div style="position:relative">
+            <input class="form-input" id="loginPassword" type="password"
+              placeholder="••••••••" autocomplete="new-password"
+              name="fh_password_login" style="padding-right:44px">
+            <button type="button" onclick="togglePwd('loginPassword','eyeLogin')"
+              style="position:absolute;right:12px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;padding:4px;color:var(--text3);font-size:16px;line-height:1"
+              title="Mostrar/ocultar senha">
+              <span id="eyeLogin">👁</span>
+            </button>
+          </div>
+        </div>
+        <div class="form-error" id="loginError"></div>
+        <button class="btn-login" id="btnLogin" onclick="doLogin()">
+          <span id="loginBtnTxt">Entrar →</span>
+          <div class="spinner" id="loginSpinner"></div>
+        </button>
+      </div>
+
+      <!-- Register form -->
+      <div id="formRegister" style="display:none">
+        <div class="form-group">
+          <label class="form-label">Nome completo *</label>
+          <input class="form-input" id="regName" placeholder="João da Silva" autocomplete="name">
+        </div>
+        <div class="form-group">
+          <label class="form-label">E-mail *</label>
+          <input class="form-input" id="regEmail" type="email" placeholder="seu@email.com" autocomplete="email">
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <div class="form-group">
+            <label class="form-label">CPF (chave da conta)</label>
+            <input class="form-input" id="regCpf" placeholder="000.000.000-00" inputmode="numeric">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Login (apelido)</label>
+            <input class="form-input" id="regLogin" placeholder="Ex: joaosilva">
+          </div>
+        </div>
+        <div style="font-size:11px;color:var(--text3);margin-bottom:12px">O CPF é a chave imutável da conta. O login é opcional e pode ser alterado.</div>
+        <div class="form-group">
+          <label class="form-label">Senha *</label>
+          <div style="position:relative">
+            <input class="form-input" id="regPassword" type="password"
+              placeholder="Mínimo 6 caracteres" autocomplete="new-password"
+              oninput="checkPwdStrength()" style="padding-right:44px">
+            <button type="button" onclick="togglePwd('regPassword','eyeReg')"
+              style="position:absolute;right:12px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;padding:4px;color:var(--text3);font-size:16px;line-height:1"
+              title="Mostrar/ocultar senha">
+              <span id="eyeReg">👁</span>
+            </button>
+          </div>
+          <div class="pwd-strength" id="pwdStrength"></div>
+        </div>
+        <div class="form-error" id="regError"></div>
+        <button class="btn-login" id="btnRegister" onclick="doRegister()">
+          <span id="regBtnTxt">Criar conta grátis →</span>
+          <div class="spinner" id="regSpinner"></div>
+        </button>
+        <p style="text-align:center;font-size:12px;color:var(--text3);margin-top:14px">Ao criar a conta você concorda com os Termos de Uso</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- FOOTER -->
+<footer>
+  <div class="footer-logo">FinanceHub</div>
+  <div class="footer-links">
+    <a href="#features">Recursos</a>
+    <a href="#planos">Planos</a>
+    <a href="#como-funciona">Como funciona</a>
+    <a href="#login">Entrar</a>
+  </div>
+  <div class="footer-copy">© 2026 FinanceHub · Todos os direitos reservados</div>
+</footer>
+
+<script>
+const API = window.location.origin + '/api';
+
+// ── TABS ──
+function switchTab(tab) {
+  document.getElementById('tabLogin').classList.toggle('active', tab==='login');
+  document.getElementById('tabRegister').classList.toggle('active', tab==='register');
+  document.getElementById('formLogin').style.display    = tab==='login'    ? '' : 'none';
+  document.getElementById('formRegister').style.display = tab==='register' ? '' : 'none';
+  // Sempre limpa e reseta os campos ao trocar de aba
+  if (tab === 'login') {
+    const id = document.getElementById('loginIdentifier');
+    const pw = document.getElementById('loginPassword');
+    const er = document.getElementById('loginError');
+    if (id) { id.value = ''; id.blur(); }
+    if (pw) { pw.value = ''; pw.type = 'password'; }
+    const eye = document.getElementById('eyeLogin');
+    if (eye) eye.textContent = '👁';
+    if (er) er.style.display = 'none';
+  }
+}
+
+// ── LOGIN ──
+function togglePwd(inputId, eyeId) {
+  const input = document.getElementById(inputId);
+  const eye   = document.getElementById(eyeId);
+  if (!input) return;
+  if (input.type === 'password') {
+    input.type = 'text';
+    if (eye) eye.textContent = '🔒';
+  } else {
+    input.type = 'password';
+    if (eye) eye.textContent = '👁';
+  }
+}
+
+async function doLogin() {
+  const identifier = document.getElementById('loginIdentifier').value.trim();
+  const pwd        = document.getElementById('loginPassword').value;
+  const errEl      = document.getElementById('loginError');
+  errEl.style.display='none';
+  if (!identifier||!pwd) { errEl.textContent='Preencha o identificador e a senha'; errEl.style.display='block'; return; }
+
+  setLoading('login', true);
+  try {
+    const res = await fetch(API+'/auth/login', {
+      method:'POST', credentials:'include',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({identifier, password:pwd}),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error||'Credenciais inválidas');
+    sessionStorage.setItem('fh_token', data.token);
+    sessionStorage.setItem('fh_user', JSON.stringify(data.user));
+    // Limpa os campos antes de redirecionar
+    document.getElementById('loginIdentifier').value = '';
+    document.getElementById('loginPassword').value   = '';
+    window.location.href = '/dashboard.html';
+  } catch(e) {
+    errEl.textContent = e.message; errEl.style.display='block';
+  } finally { setLoading('login', false); }
+}
+
+// ── REGISTER ──
+async function doRegister() {
+  const name      = document.getElementById('regName').value.trim();
+  const email     = document.getElementById('regEmail').value.trim();
+  const pwd       = document.getElementById('regPassword').value;
+  const cpf       = document.getElementById('regCpf')?.value.trim()||'';
+  const login_name= document.getElementById('regLogin')?.value.trim()||'';
+  const errEl     = document.getElementById('regError');
+  errEl.style.display='none';
+  if (!name||!email||!pwd) { errEl.textContent='Nome, e-mail e senha são obrigatórios'; errEl.style.display='block'; return; }
+
+  setLoading('register', true);
+  try {
+    const res = await fetch(API+'/auth/register', {
+      method:'POST', credentials:'include',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({name, email, password:pwd, cpf:cpf||undefined, login_name:login_name||undefined}),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error||'Erro ao criar conta');
+    sessionStorage.setItem('fh_token', data.token);
+    sessionStorage.setItem('fh_user', JSON.stringify(data.user));
+    // Limpa formulário
+    ['regName','regEmail','regPassword','regCpf','regLogin'].forEach(id=>{
+      const el=document.getElementById(id); if(el) el.value='';
+    });
+    window.location.href = '/dashboard.html';
+  } catch(e) {
+    errEl.textContent = e.message; errEl.style.display='block';
+  } finally { setLoading('register', false); }
+}
+
+function setLoading(form, loading) {
+  const btn = document.getElementById(form==='login'?'btnLogin':'btnRegister');
+  const txt = document.getElementById(form==='login'?'loginBtnTxt':'regBtnTxt');
+  const sp  = document.getElementById(form==='login'?'loginSpinner':'regSpinner');
+  btn.disabled = loading;
+  txt.textContent = loading ? 'Aguarde...' : (form==='login'?'Entrar →':'Criar conta grátis →');
+  sp.style.display = loading ? 'block' : 'none';
+}
+
+function checkPwdStrength() {
+  const pwd = document.getElementById('regPassword').value;
+  const bar = document.getElementById('pwdStrength');
+  let score = 0;
+  if (pwd.length >= 10) score++;
+  if (/[A-Z]/.test(pwd)) score++;
+  if (/[0-9]/.test(pwd)) score++;
+  if (/[^A-Za-z0-9]/.test(pwd)) score++;
+  const colors = ['#ff4d6d','#ff6b35','#f7c948','#00e5a0'];
+  const widths  = ['25%','50%','75%','100%'];
+  bar.style.background = colors[score-1]||'var(--border)';
+  bar.style.width      = score>0 ? widths[score-1] : '0';
+}
+
+// ── COTAÇÕES TICKER ──
+async function loadQuotes() {
+  try {
+    // CoinGecko free API
+    const [cryptoRes, fxRes] = await Promise.allSettled([
+      fetch('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum,solana&vs_currencies=usd&include_24hr_change=true'),
+      fetch('https://economia.awesomeapi.com.br/json/last/USD-BRL,EUR-BRL'),
+    ]);
+
+    if (cryptoRes.status==='fulfilled'&&cryptoRes.value.ok) {
+      const c = await cryptoRes.value.json();
+      setTicker('btc', '$'+numFmt(c.bitcoin?.usd), c.bitcoin?.usd_24h_change);
+      setTicker('eth', '$'+numFmt(c.ethereum?.usd), c.ethereum?.usd_24h_change);
+      setTicker('sol', '$'+numFmt(c.solana?.usd),   c.solana?.usd_24h_change);
+    }
+    if (fxRes.status==='fulfilled'&&fxRes.value.ok) {
+      const fx = await fxRes.value.json();
+      const usd = fx.USDBRL; const eur = fx.EURBRL;
+      if (usd) setTicker('usd', 'R$'+parseFloat(usd.bid).toFixed(4), parseFloat(usd.pctChange));
+      if (eur) setTicker('eur', 'R$'+parseFloat(eur.bid).toFixed(4), parseFloat(eur.pctChange));
+    }
+  } catch(e) { /* silencioso */ }
+}
+
+function setTicker(key, price, change) {
+  const up = change >= 0;
+  const chgStr = (up?'+':'')+parseFloat(change||0).toFixed(2)+'%';
+  ['','2'].forEach(sfx => {
+    const pel = document.getElementById('tk-'+key+sfx);
+    const cel = document.getElementById('tk-'+key+'-chg'+sfx);
+    if (pel) pel.textContent = price;
+    if (cel) { cel.textContent = chgStr; cel.className = 'ticker-change '+(up?'up':'down'); }
+  });
+}
+
+function numFmt(n) {
+  if (!n) return '—';
+  if (n >= 1000) return n.toLocaleString('en-US', {maximumFractionDigits:0});
+  return n.toLocaleString('en-US', {minimumFractionDigits:2,maximumFractionDigits:2});
+}
+
+// ── SCROLL ANIMATIONS ──
+const observer = new IntersectionObserver(entries => {
+  entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('visible'); });
+}, { threshold: 0.1 });
+document.querySelectorAll('.fade-in').forEach(el => observer.observe(el));
+
+// ── ENTER KEY ──
+document.addEventListener('keydown', e => {
+  if (e.key === 'Enter') {
+    const loginVisible = document.getElementById('formLogin').style.display !== 'none';
+    if (loginVisible) { const id=document.getElementById('loginIdentifier'); const pw=document.getElementById('loginPassword'); if(id===document.activeElement||pw===document.activeElement) doLogin(); }
+    else doRegister();
+  }
+});
+
+// ── INIT ──
+// Se já logado, redireciona direto
+(async () => {
+  const token = sessionStorage.getItem('fh_token');
+  if (token) {
+    try {
+      const r = await fetch(API+'/auth/me', {headers:{'Authorization':'Bearer '+token},credentials:'include'});
+      if (r.ok) { window.location.href='/dashboard.html'; return; }
+    } catch {}
+  }
+  loadQuotes();
+  setInterval(loadQuotes, 60000);
+})();
+</script>
+</body>
+</html>

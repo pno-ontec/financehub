@@ -1,0 +1,25 @@
+# Git
+.git/
+.gitignore
+.github/
+
+# Node (no container, não na imagem)
+node_modules/
+npm-debug.log*
+*.log
+
+# Dados (vão em volumes Docker)
+server/data/
+server/uploads/
+logs/
+
+# NÃO ignorar server/.env aqui — o ENTRYPOINT cria dentro do volume
+# Se ignorarmos, o arquivo gerado dentro do container some no mount
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/

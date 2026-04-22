@@ -1,0 +1,693 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#080b12">
+<title>FinanceHub</title>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@600;700;800&family=DM+Mono:wght@400;500&family=Lato:wght@300;400;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#080b12;--surface:#0f1420;--surface2:#161d2e;--border:#1e2a40;
+    --accent:#00e5a0;--blue:#3d8eff;--red:#ff4d6d;--yellow:#f7c948;
+    --text:#f0f4ff;--text2:#9aaac8;--text3:#5a6a8a;
+    --safe-top:env(safe-area-inset-top,0px);
+    --safe-bot:env(safe-area-inset-bottom,20px);
+  }
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+  body{font-family:'Lato',sans-serif;background:var(--bg);color:var(--text);height:100vh;overflow:hidden;display:flex;flex-direction:column;}
+  
+  /* STATUS BAR */
+  .status-bar{height:calc(44px + var(--safe-top));padding-top:var(--safe-top);background:var(--surface);display:flex;align-items:flex-end;justify-content:space-between;padding-bottom:8px;padding-left:20px;padding-right:20px;flex-shrink:0;}
+  .status-logo{font-family:'Bricolage Grotesque',sans-serif;font-weight:800;font-size:18px;color:var(--accent);}
+  .status-right{display:flex;align-items:center;gap:12px;}
+  .notif-dot{width:8px;height:8px;border-radius:50%;background:var(--red);}
+  .avatar-sm{width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,var(--blue),var(--accent));display:flex;align-items:center;justify-content:center;font-weight:800;font-size:11px;color:#000;cursor:pointer;}
+
+  /* MAIN SCROLL AREA */
+  .main-scroll{flex:1;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;padding-bottom:calc(80px + var(--safe-bot));}
+  
+  /* TABS */
+  .tab-bar{position:fixed;bottom:0;left:0;right:0;height:calc(64px + var(--safe-bot));padding-bottom:var(--safe-bot);background:var(--surface);border-top:1px solid var(--border);display:flex;align-items:flex-start;justify-content:space-around;padding-top:8px;z-index:100;}
+  .tab-item{display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer;padding:4px 12px;border-radius:10px;transition:all .2s;min-width:56px;}
+  .tab-item.active{background:rgba(0,229,160,.08);}
+  .tab-icon{font-size:20px;line-height:1;}
+  .tab-label{font-size:9px;font-family:'DM Mono',monospace;color:var(--text3);transition:color .2s;}
+  .tab-item.active .tab-label{color:var(--accent);}
+
+  /* VIEWS */
+  .view{display:none;padding:16px;}
+  .view.active{display:block;}
+  
+  /* CARDS */
+  .balance-card{background:linear-gradient(135deg,#0f1e38,#0a1525);border:1px solid rgba(61,142,255,.2);border-radius:20px;padding:24px;margin-bottom:16px;position:relative;overflow:hidden;}
+  .balance-card::before{content:'';position:absolute;top:-40px;right:-40px;width:160px;height:160px;border-radius:50%;background:radial-gradient(circle,rgba(0,229,160,.08),transparent);}
+  .balance-label{font-family:'DM Mono',monospace;font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:8px;}
+  .balance-val{font-family:'Bricolage Grotesque',sans-serif;font-weight:800;font-size:36px;color:var(--accent);margin-bottom:4px;}
+  .balance-sub{font-size:12px;color:var(--text3);}
+  .balance-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:16px;}
+  .balance-item{background:rgba(255,255,255,.04);border-radius:10px;padding:10px 12px;}
+  .bi-label{font-size:10px;color:var(--text3);margin-bottom:4px;font-family:'DM Mono',monospace;}
+  .bi-val{font-family:'Bricolage Grotesque',sans-serif;font-weight:700;font-size:16px;}
+
+  /* QUICK ACTIONS */
+  .quick-actions{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:20px;}
+  .qa-btn{display:flex;flex-direction:column;align-items:center;gap:6px;background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:14px 8px;cursor:pointer;transition:all .2s;active:transform:scale(.95);}
+  .qa-btn:active{transform:scale(.95);background:var(--surface2);}
+  .qa-icon{font-size:22px;}
+  .qa-label{font-size:10px;color:var(--text2);font-family:'DM Mono',monospace;text-align:center;}
+
+  /* SECTION HEADER */
+  .section-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;margin-top:20px;}
+  .section-title{font-family:'Bricolage Grotesque',sans-serif;font-weight:700;font-size:16px;}
+  .section-link{font-size:12px;color:var(--accent);font-family:'DM Mono',monospace;}
+
+  /* TX LIST */
+  .tx-item{display:flex;align-items:center;gap:12px;background:var(--surface);border-radius:12px;padding:12px 14px;margin-bottom:8px;border:1px solid var(--border);}
+  .tx-icon-wrap{width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;}
+  .tx-info{flex:1;min-width:0;}
+  .tx-name{font-weight:700;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .tx-date{font-size:11px;color:var(--text3);font-family:'DM Mono',monospace;}
+  .tx-amount{font-family:'Bricolage Grotesque',sans-serif;font-weight:700;font-size:15px;flex-shrink:0;}
+  .tx-in{color:var(--accent);}
+  .tx-out{color:var(--red);}
+
+  /* SCORE RING */
+  .score-wrap{background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:20px;display:flex;align-items:center;gap:20px;margin-bottom:16px;}
+  .score-ring{position:relative;flex-shrink:0;}
+  .score-val{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;}
+  .score-num{font-family:'Bricolage Grotesque',sans-serif;font-weight:800;font-size:22px;}
+  .score-info{flex:1;}
+  .score-title{font-family:'Bricolage Grotesque',sans-serif;font-weight:700;font-size:16px;margin-bottom:4px;}
+  .score-sub{font-size:12px;color:var(--text2);line-height:1.5;}
+
+  /* ALERTS */
+  .alert-card{display:flex;gap:10px;background:var(--surface);border-radius:12px;padding:14px;margin-bottom:8px;border-left:3px solid;}
+  .alert-card.danger{border-color:var(--red);}
+  .alert-card.warning{border-color:var(--yellow);}
+  .alert-icon{font-size:18px;flex-shrink:0;}
+  .alert-msg{font-size:13px;line-height:1.4;}
+  .alert-date{font-size:11px;color:var(--text3);margin-top:2px;font-family:'DM Mono',monospace;}
+
+  /* ADD TX SHEET */
+  .sheet-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:200;display:none;align-items:flex-end;}
+  .sheet-overlay.open{display:flex;}
+  .sheet{background:var(--surface);border-radius:24px 24px 0 0;padding:24px 20px calc(20px + var(--safe-bot));width:100%;max-height:90vh;overflow-y:auto;transform:translateY(100%);transition:transform .3s ease;}
+  .sheet-overlay.open .sheet{transform:translateY(0);}
+  .sheet-handle{width:40px;height:4px;background:var(--border);border-radius:2px;margin:0 auto 20px;}
+  .sheet-title{font-family:'Bricolage Grotesque',sans-serif;font-weight:800;font-size:20px;margin-bottom:20px;}
+  .flow-toggle{display:flex;background:var(--surface2);border-radius:12px;padding:4px;margin-bottom:20px;}
+  .flow-btn{flex:1;padding:10px;text-align:center;border-radius:9px;font-weight:700;font-size:14px;cursor:pointer;transition:all .2s;}
+  .flow-btn.active.out{background:rgba(255,77,109,.15);color:var(--red);}
+  .flow-btn.active.in{background:rgba(0,229,160,.15);color:var(--accent);}
+  .amount-input{font-family:'Bricolage Grotesque',sans-serif;font-weight:800;font-size:40px;color:var(--text);background:transparent;border:none;outline:none;width:100%;text-align:center;margin-bottom:20px;}
+  .amount-input::placeholder{color:var(--border);}
+  .form-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px;}
+  .form-field{display:flex;flex-direction:column;gap:6px;}
+  .form-label{font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:1px;font-family:'DM Mono',monospace;}
+  .form-input{background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:10px;padding:12px;font-size:14px;outline:none;width:100%;}
+  .form-input:focus{border-color:var(--accent);}
+  .btn-save{width:100%;padding:16px;background:var(--accent);color:#000;border:none;border-radius:14px;font-weight:800;font-size:16px;cursor:pointer;font-family:'Bricolage Grotesque',sans-serif;margin-top:8px;}
+
+  /* CAMERA */
+  .camera-btn{width:100%;padding:14px;background:var(--surface2);border:2px dashed var(--border);color:var(--text2);border-radius:14px;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px;margin-bottom:14px;transition:all .2s;}
+  .camera-btn:active{border-color:var(--accent);color:var(--accent);}
+  #photoInput{display:none;}
+
+  /* PHOTO PREVIEW */
+  .photo-preview{border-radius:12px;overflow:hidden;margin-bottom:14px;display:none;}
+  .photo-preview img{width:100%;max-height:200px;object-fit:cover;}
+  .photo-analyzing{text-align:center;padding:20px;color:var(--text2);font-size:13px;}
+
+  /* PROFILE */
+  .profile-section{background:var(--surface);border-radius:16px;padding:20px;margin-bottom:14px;}
+  .profile-avatar{width:64px;height:64px;border-radius:50%;background:linear-gradient(135deg,var(--blue),var(--accent));display:flex;align-items:center;justify-content:center;font-weight:800;font-size:24px;color:#000;margin:0 auto 12px;}
+  .profile-name{font-family:'Bricolage Grotesque',sans-serif;font-weight:800;font-size:20px;text-align:center;margin-bottom:4px;}
+  .profile-email{font-size:13px;color:var(--text3);text-align:center;font-family:'DM Mono',monospace;margin-bottom:16px;}
+  .profile-field{margin-bottom:12px;}
+
+  /* SPINNER */
+  .spinner{width:20px;height:20px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite;display:inline-block;}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  
+  .badge{background:rgba(0,229,160,.1);border:1px solid rgba(0,229,160,.3);border-radius:20px;padding:3px 10px;font-size:11px;color:var(--accent);font-family:'DM Mono',monospace;display:inline-block;}
+  .empty{text-align:center;padding:40px 20px;color:var(--text3);font-size:14px;}
+  .empty-icon{font-size:40px;margin-bottom:12px;}
+
+  /* TOAST */
+  .toast{position:fixed;top:calc(60px + var(--safe-top));left:16px;right:16px;background:var(--surface);border:1px solid var(--accent);border-radius:12px;padding:12px 16px;font-size:13px;color:var(--accent);z-index:300;display:none;text-align:center;}
+  .toast.show{display:block;animation:fadeIn .3s ease;}
+  .toast.err{border-color:var(--red);color:var(--red);}
+  @keyframes fadeIn{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:translateY(0)}}
+</style>
+</head>
+<body>
+
+<!-- STATUS BAR -->
+<div class="status-bar">
+  <div class="status-logo">FH</div>
+  <div class="status-right">
+    <div class="notif-dot" id="notifDot" style="display:none"></div>
+    <div class="avatar-sm" id="avatarBtn" onclick="showTab('profile')">?</div>
+  </div>
+</div>
+
+<!-- MAIN CONTENT -->
+<div class="main-scroll">
+
+  <!-- HOME -->
+  <div class="view active" id="tabHome">
+    <div class="balance-card">
+      <div class="balance-label">Saldo Total</div>
+      <div class="balance-val" id="m-saldo">R$ —</div>
+      <div class="balance-sub" id="m-sub">Carregando...</div>
+      <div class="balance-row">
+        <div class="balance-item">
+          <div class="bi-label">Receitas</div>
+          <div class="bi-val" style="color:var(--accent)" id="m-receitas">—</div>
+        </div>
+        <div class="balance-item">
+          <div class="bi-label">Despesas</div>
+          <div class="bi-val" style="color:var(--red)" id="m-despesas">—</div>
+        </div>
+        <div class="balance-item">
+          <div class="bi-label">A Pagar</div>
+          <div class="bi-val" style="color:var(--yellow)" id="m-apagar">—</div>
+        </div>
+        <div class="balance-item">
+          <div class="bi-label">Cartões</div>
+          <div class="bi-val" style="color:var(--blue)" id="m-cartoes">—</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="quick-actions">
+      <div class="qa-btn" onclick="openAddTx('out')">
+        <div class="qa-icon">➕</div>
+        <div class="qa-label">Gasto</div>
+      </div>
+      <div class="qa-btn" onclick="openAddTx('in')">
+        <div class="qa-icon">💰</div>
+        <div class="qa-label">Receita</div>
+      </div>
+      <div class="qa-btn" onclick="openCamera()">
+        <div class="qa-icon">📷</div>
+        <div class="qa-label">Foto</div>
+      </div>
+      <div class="qa-btn" onclick="showTab('alerts')">
+        <div class="qa-icon">🔔</div>
+        <div class="qa-label">Alertas</div>
+      </div>
+    </div>
+
+    <!-- Score -->
+    <div class="score-wrap" id="m-scoreWrap">
+      <div class="score-ring">
+        <svg width="72" height="72" viewBox="0 0 72 72">
+          <circle cx="36" cy="36" r="28" fill="none" stroke="var(--border)" stroke-width="8"/>
+          <circle cx="36" cy="36" r="28" fill="none" stroke="var(--accent)" stroke-width="8"
+            stroke-dasharray="175.9" stroke-dashoffset="175.9" stroke-linecap="round"
+            transform="rotate(-90 36 36)" id="m-scoreArc"/>
+        </svg>
+        <div class="score-val">
+          <div class="score-num" id="m-scoreNum" style="color:var(--accent)">—</div>
+        </div>
+      </div>
+      <div class="score-info">
+        <div class="score-title" id="m-scoreLvl">Saúde Financeira</div>
+        <div class="score-sub" id="m-scoreMsg">Calculando seu score...</div>
+      </div>
+    </div>
+
+    <!-- Últimas Transações -->
+    <div class="section-header">
+      <div class="section-title">Últimas</div>
+      <div class="section-link" onclick="showTab('txs')">Ver todas →</div>
+    </div>
+    <div id="m-txList"><div class="empty"><div class="empty-icon">📭</div>Nenhuma transação</div></div>
+  </div>
+
+  <!-- TRANSAÇÕES -->
+  <div class="view" id="tabTxs">
+    <div style="display:flex;gap:8px;margin-bottom:14px;overflow-x:auto;padding-bottom:4px;white-space:nowrap">
+      <button class="badge active" id="tf-all"   onclick="setTxFilter('all',this)"   style="cursor:pointer">Todas</button>
+      <button class="badge" id="tf-out"  onclick="setTxFilter('out',this)"  style="cursor:pointer;background:rgba(255,77,109,.1);border-color:rgba(255,77,109,.3);color:var(--red)">Saídas</button>
+      <button class="badge" id="tf-in"   onclick="setTxFilter('in',this)"   style="cursor:pointer;background:rgba(0,229,160,.1);border-color:rgba(0,229,160,.3)">Entradas</button>
+      <button class="badge" id="tf-pend" onclick="setTxFilter('pending',this)" style="cursor:pointer;background:rgba(247,201,72,.1);border-color:rgba(247,201,72,.3);color:var(--yellow)">Pendentes</button>
+    </div>
+    <div id="m-allTxList"><div class="empty"><div class="empty-icon">📭</div>Carregando...</div></div>
+  </div>
+
+  <!-- ALERTAS -->
+  <div class="view" id="tabAlerts">
+    <div class="section-title" style="margin-bottom:16px">Alertas e Vencimentos</div>
+    <div id="m-alertsList"><div class="empty"><div class="empty-icon">✅</div>Nenhum alerta</div></div>
+  </div>
+
+  <!-- PERFIL -->
+  <div class="view" id="tabProfile">
+    <div class="profile-section">
+      <div class="profile-avatar" id="m-profileAvatar">?</div>
+      <div class="profile-name" id="m-profileName">—</div>
+      <div class="profile-email" id="m-profileEmail">—</div>
+    </div>
+
+    <div class="profile-section">
+      <div style="font-family:'Bricolage Grotesque',sans-serif;font-weight:700;font-size:15px;margin-bottom:14px">Editar Perfil</div>
+      <div class="profile-field">
+        <label class="form-label">Nome</label>
+        <input class="form-input" id="p-name" placeholder="Seu nome">
+      </div>
+      <div class="profile-field">
+        <label class="form-label">Login (apelido)</label>
+        <input class="form-input" id="p-login" placeholder="Ex: paulinho">
+      </div>
+      <div class="profile-field">
+        <label class="form-label">CPF</label>
+        <input class="form-input" id="p-cpf" placeholder="000.000.000-00" inputmode="numeric">
+      </div>
+      <div style="font-size:12px;color:var(--text3);margin-bottom:12px">O CPF é a chave principal da conta e não pode ser transferido.</div>
+      <div class="profile-field">
+        <label class="form-label">Senha atual (para alterar senha)</label>
+        <input class="form-input" id="p-current-pwd" type="password" placeholder="••••••••">
+      </div>
+      <div class="profile-field">
+        <label class="form-label">Nova Senha</label>
+        <input class="form-input" id="p-new-pwd" type="password" placeholder="••••••••">
+      </div>
+      <button class="btn-save" onclick="saveProfile()">Salvar Perfil</button>
+    </div>
+
+    <div class="profile-section">
+      <div style="font-family:'Bricolage Grotesque',sans-serif;font-weight:700;font-size:15px;margin-bottom:8px">Assinatura</div>
+      <div id="m-subInfo" style="font-size:13px;color:var(--text2)">Carregando...</div>
+    </div>
+
+    <button onclick="doLogout()" style="width:100%;padding:14px;background:rgba(255,77,109,.08);border:1px solid rgba(255,77,109,.3);color:var(--red);border-radius:14px;font-size:14px;cursor:pointer;font-family:'Bricolage Grotesque',sans-serif;font-weight:700;margin-bottom:20px">
+      Sair da conta
+    </button>
+
+    <div style="text-align:center;margin-bottom:20px">
+      <a href="/dashboard.html" style="color:var(--accent);text-decoration:none;font-size:13px;font-family:'DM Mono',monospace">🖥️ Abrir versão completa →</a>
+    </div>
+  </div>
+
+</div>
+
+<!-- TAB BAR -->
+<div class="tab-bar">
+  <div class="tab-item active" id="tab-home" onclick="showTab('home')">
+    <div class="tab-icon">🏠</div>
+    <div class="tab-label">Início</div>
+  </div>
+  <div class="tab-item" id="tab-txs" onclick="showTab('txs')">
+    <div class="tab-icon">📋</div>
+    <div class="tab-label">Lançamentos</div>
+  </div>
+  <div class="tab-item" id="tab-add" onclick="openAddTx('out')" style="margin-top:-8px">
+    <div style="width:48px;height:48px;border-radius:50%;background:var(--accent);display:flex;align-items:center;justify-content:center;font-size:24px;color:#000;box-shadow:0 4px 16px rgba(0,229,160,.4)">+</div>
+    <div class="tab-label">Novo</div>
+  </div>
+  <div class="tab-item" id="tab-alerts" onclick="showTab('alerts')">
+    <div class="tab-icon">🔔</div>
+    <div class="tab-label">Alertas</div>
+  </div>
+  <div class="tab-item" id="tab-profile" onclick="showTab('profile')">
+    <div class="tab-icon">👤</div>
+    <div class="tab-label">Perfil</div>
+  </div>
+</div>
+
+<!-- ADD TX SHEET -->
+<div class="sheet-overlay" id="addTxSheet" onclick="closeSheet(event)">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-title" id="sheetTitle">Novo Gasto</div>
+
+    <!-- Camera option -->
+    <button class="camera-btn" onclick="openCamera()">
+      📷 Adicionar por foto do comprovante
+    </button>
+    <input type="file" id="photoInput" accept="image/*" capture="environment" onchange="handlePhoto(this.files[0])">
+    <div class="photo-preview" id="photoPreview">
+      <img id="photoImg" src="" alt="">
+    </div>
+    <div class="photo-analyzing" id="photoAnalyzing" style="display:none">
+      <div class="spinner"></div>
+      <div style="margin-top:8px">Interpretando comprovante...</div>
+    </div>
+
+    <div class="flow-toggle">
+      <div class="flow-btn active out" id="m-flowOut" onclick="setMFlow('out')">− Gasto</div>
+      <div class="flow-btn in" id="m-flowIn" onclick="setMFlow('in')">+ Entrada</div>
+    </div>
+    <input type="hidden" id="m-flow" value="out">
+
+    <input class="amount-input" id="m-amount" type="number" inputmode="decimal" placeholder="R$ 0,00" step="0.01" min="0">
+
+    <div class="form-row">
+      <div class="form-field">
+        <label class="form-label">Descrição *</label>
+        <input class="form-input" id="m-desc" placeholder="Ex: Almoço">
+      </div>
+      <div class="form-field">
+        <label class="form-label">Data</label>
+        <input class="form-input" id="m-date" type="date">
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-field">
+        <label class="form-label">Conta</label>
+        <select class="form-input" id="m-account">
+          <option value="">Sem conta</option>
+        </select>
+      </div>
+      <div class="form-field">
+        <label class="form-label">Categoria</label>
+        <select class="form-input" id="m-category">
+          <option value="">Automático</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-field" style="margin-bottom:14px">
+      <label class="form-label">Status</label>
+      <select class="form-input" id="m-status">
+        <option value="paid">Pago / Recebido</option>
+        <option value="pending">Pendente</option>
+      </select>
+    </div>
+
+    <button class="btn-save" id="m-saveBtn" onclick="saveTx()">Salvar</button>
+  </div>
+</div>
+
+<div class="toast" id="m-toast"></div>
+
+<script>
+const API = window.location.origin + '/api';
+let TOKEN = sessionStorage.getItem('fh_token') || '';
+let state = { txs:[], accounts:[], categories:[], summary:{}, score:null, alerts:[] };
+let _txFilter = 'all';
+
+// ── AUTH ──────────────────────────────────────────────────────────────────────
+async function init() {
+  if (!TOKEN) { window.location.href = '/'; return; }
+  try {
+    const me = await api('/auth/me');
+    document.getElementById('avatarBtn').textContent = (me.name||'U')[0].toUpperCase();
+    document.getElementById('m-profileAvatar').textContent = (me.name||'U')[0].toUpperCase();
+    document.getElementById('m-profileName').textContent  = me.name||'—';
+    document.getElementById('m-profileEmail').textContent = me.email||'—';
+    document.getElementById('p-name').value       = me.name||'';
+    document.getElementById('p-login').value      = me.login_name||'';
+    document.getElementById('p-cpf').value        = me.cpf||'';
+    sessionStorage.setItem('fh_user', JSON.stringify(me));
+    loadAll();
+  } catch { window.location.href = '/'; }
+}
+
+async function api(path, opts={}) {
+  const res = await fetch(API+path, {
+    ...opts,
+    headers:{'Content-Type':'application/json','Authorization':'Bearer '+TOKEN,...(opts.headers||{})},
+    credentials:'include',
+  });
+  if (res.status===401) { window.location.href='/'; throw new Error('auth'); }
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error||'Erro');
+  return data;
+}
+
+async function loadAll() {
+  try {
+    const [dash, txRes, scoreData, alertsData, sub] = await Promise.allSettled([
+      api('/data/dashboard'),
+      api('/data/transactions?limit=20'),
+      api('/analysis/health'),
+      api('/analysis/alerts'),
+      api('/subscription/status'),
+    ]);
+
+    if (dash.status==='fulfilled') {
+      const d = dash.value;
+      state.summary   = d.summary||{};
+      state.accounts  = d.accounts||[];
+      state.categories= d.categories||[];
+      if (state.summary.a_pagar!==undefined) state.summary.aPagar=state.summary.a_pagar;
+      renderSummary();
+      populateSelects();
+    }
+    if (txRes.status==='fulfilled') {
+      state.txs = txRes.value.transactions||[];
+      renderTxList();
+    }
+    if (scoreData.status==='fulfilled') {
+      state.score = scoreData.value;
+      renderScore();
+    }
+    if (alertsData.status==='fulfilled') {
+      state.alerts = alertsData.value||[];
+      renderAlerts();
+    }
+    if (sub.status==='fulfilled') {
+      const s = sub.value;
+      const labels = {trial:'Trial',individual:'Individual',family_s:'Família S',family_m:'Família M',family_l:'Família L',admin:'Admin Master'};
+      document.getElementById('m-subInfo').innerHTML = 
+        `<span style="color:var(--accent);font-weight:700">${labels[s.plan]||s.plan}</span> · ${s.daysLeft===99999?'Vitalício':s.daysLeft+' dias restantes'}`;
+    }
+  } catch(e) { toast('Erro ao carregar', true); }
+}
+
+// ── RENDER ────────────────────────────────────────────────────────────────────
+function fmt(v) { return 'R$'+(+v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+function fmtDate(s) { if(!s)return'—'; const[y,m,d]=(s||'').split('T')[0].split('-'); return `${d}/${m}`; }
+
+function renderSummary() {
+  const s = state.summary;
+  document.getElementById('m-saldo').textContent    = fmt(s.saldo||0);
+  document.getElementById('m-receitas').textContent = fmt(s.receitas||0);
+  document.getElementById('m-despesas').textContent = fmt(s.despesas||0);
+  document.getElementById('m-apagar').textContent   = fmt(s.aPagar||0);
+  // Cartões - soma saldo das contas de crédito
+  const cardTotal = state.accounts.filter(a=>a.type==='credit').reduce((s,a)=>s+Math.abs(a.balance||0),0);
+  document.getElementById('m-cartoes').textContent  = fmt(cardTotal);
+  document.getElementById('m-sub').textContent = `${state.accounts.length} conta(s) · mês atual`;
+}
+
+function renderScore() {
+  if (!state.score) return;
+  const s = state.score;
+  const circ = 2*Math.PI*28;
+  const dash  = (s.score/100)*circ;
+  const arc   = document.getElementById('m-scoreArc');
+  if (arc) { arc.style.stroke=s.color; arc.setAttribute('stroke-dasharray',`${dash} ${circ-dash}`); }
+  document.getElementById('m-scoreNum').textContent = s.score;
+  document.getElementById('m-scoreNum').style.color = s.color;
+  const labels = {excelente:'✅ Excelente',bom:'👍 Bom',regular:'⚠️ Regular',critico:'🚨 Crítico'};
+  document.getElementById('m-scoreLvl').textContent = labels[s.level]||s.level;
+  document.getElementById('m-scoreMsg').textContent = s.insights?.[0]?.msg || 'Suas finanças estão sendo monitoradas';
+}
+
+function renderAlerts() {
+  const alerts = state.alerts;
+  const dot = document.getElementById('notifDot');
+  if (dot) dot.style.display = alerts.length?'':'none';
+
+  const el = document.getElementById('m-alertsList');
+  if (!el) return;
+  el.innerHTML = alerts.length ? alerts.map(a=>`
+    <div class="alert-card ${a.type}">
+      <div class="alert-icon">${a.type==='danger'?'🚨':'⚠️'}</div>
+      <div>
+        <div class="alert-msg">${a.msg}</div>
+        ${a.date?`<div class="alert-date">${a.date.slice(0,10)}</div>`:''}
+      </div>
+    </div>`).join('') : '<div class="empty"><div class="empty-icon">✅</div>Nenhum alerta!</div>';
+}
+
+const CAT_ICONS = {Alimentação:'🍽️',Moradia:'🏠',Transporte:'🚗',Saúde:'🏥',Educação:'📚',
+  Entretenimento:'🎬',Utilidades:'⚡',Impostos:'🧾',Compras:'🛍️','Salário CLT':'💼',Outros:'📦'};
+
+function txCard(t) {
+  const icon = CAT_ICONS[t.category_name]||'💳';
+  const bgColor = t.flow==='in'?'rgba(0,229,160,.1)':'rgba(255,77,109,.1)';
+  return `<div class="tx-item">
+    <div class="tx-icon-wrap" style="background:${bgColor}">${icon}</div>
+    <div class="tx-info">
+      <div class="tx-name">${t.description||'—'}</div>
+      <div class="tx-date">${fmtDate(t.date)} · ${t.account_name||'—'}</div>
+    </div>
+    <div class="tx-amount ${t.flow==='in'?'tx-in':'tx-out'}">${t.flow==='in'?'+':'−'}${fmt(t.amount)}</div>
+  </div>`;
+}
+
+function renderTxList() {
+  const el = document.getElementById('m-txList');
+  if (!el) return;
+  const top = state.txs.slice(0,8);
+  el.innerHTML = top.length ? top.map(txCard).join('') : '<div class="empty"><div class="empty-icon">📭</div>Nenhuma transação</div>';
+}
+
+function setTxFilter(f, el) {
+  _txFilter = f;
+  document.querySelectorAll('#tabTxs .badge').forEach(b=>b.style.opacity='0.5');
+  if (el) el.style.opacity='1';
+  renderAllTxList();
+}
+
+function renderAllTxList() {
+  const el = document.getElementById('m-allTxList');
+  if (!el) return;
+  let txs = state.txs;
+  if (_txFilter==='out')     txs = txs.filter(t=>t.flow==='out');
+  else if (_txFilter==='in') txs = txs.filter(t=>t.flow==='in');
+  else if (_txFilter==='pending') txs = txs.filter(t=>t.status==='pending'||t.status==='overdue');
+  el.innerHTML = txs.length ? txs.map(txCard).join('') : '<div class="empty"><div class="empty-icon">📭</div>Nenhuma transação</div>';
+}
+
+function populateSelects() {
+  const accSel = document.getElementById('m-account');
+  const catSel = document.getElementById('m-category');
+  while(accSel.options.length>1) accSel.remove(1);
+  while(catSel.options.length>1) catSel.remove(1);
+  state.accounts.forEach(a=>accSel.appendChild(new Option(`${a.name} (${a.bank})`,a.id)));
+  state.categories.forEach(c=>catSel.appendChild(new Option(`${c.icon||''} ${c.name}`,c.id)));
+}
+
+// ── ADD TX ────────────────────────────────────────────────────────────────────
+function openAddTx(flow) {
+  document.getElementById('m-flow').value = flow;
+  document.getElementById('m-date').value = new Date().toISOString().slice(0,10);
+  document.getElementById('m-amount').value = '';
+  document.getElementById('m-desc').value = '';
+  document.getElementById('photoPreview').style.display = 'none';
+  document.getElementById('sheetTitle').textContent = flow==='out'?'Novo Gasto':'Nova Entrada';
+  setMFlow(flow);
+  document.getElementById('addTxSheet').classList.add('open');
+  setTimeout(()=>document.getElementById('m-amount').focus(), 400);
+}
+
+function closeSheet(e) {
+  if (e.target.id==='addTxSheet') document.getElementById('addTxSheet').classList.remove('open');
+}
+
+function setMFlow(f) {
+  document.getElementById('m-flow').value = f;
+  document.getElementById('m-flowOut').className='flow-btn '+(f==='out'?'active out':'');
+  document.getElementById('m-flowIn').className='flow-btn '+(f==='in'?'active in':'');
+  document.getElementById('sheetTitle').textContent = f==='out'?'Novo Gasto':'Nova Entrada';
+}
+
+async function saveTx() {
+  const amount = parseFloat(document.getElementById('m-amount').value);
+  const desc   = document.getElementById('m-desc').value.trim();
+  if (!amount||!desc) { toast('Preencha valor e descrição', true); return; }
+  const btn = document.getElementById('m-saveBtn');
+  btn.textContent='Salvando...'; btn.disabled=true;
+  try {
+    await api('/data/transactions', {method:'POST', body:JSON.stringify({
+      description:desc, amount, flow:document.getElementById('m-flow').value,
+      date:document.getElementById('m-date').value,
+      status:document.getElementById('m-status').value,
+      account_id:document.getElementById('m-account').value||null,
+      category_id:document.getElementById('m-category').value||null,
+    })});
+    document.getElementById('addTxSheet').classList.remove('open');
+    toast('✅ Lançamento salvo!');
+    loadAll();
+  } catch(e) { toast('Erro: '+e.message, true); }
+  finally { btn.textContent='Salvar'; btn.disabled=false; }
+}
+
+// ── CAMERA / FOTO ─────────────────────────────────────────────────────────────
+function openCamera() {
+  document.getElementById('addTxSheet').classList.add('open');
+  document.getElementById('photoInput').click();
+}
+
+async function handlePhoto(file) {
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = async (e) => {
+    const img = document.getElementById('photoImg');
+    img.src = e.target.result;
+    document.getElementById('photoPreview').style.display = '';
+    document.getElementById('photoAnalyzing').style.display = '';
+
+    // Envia para API de interpretação via Claude
+    try {
+      const base64 = e.target.result.split(',')[1];
+      const mediaType = file.type || 'image/jpeg';
+      const res = await fetch(API+'/upload/interpret-photo', {
+        method:'POST',
+        headers:{'Content-Type':'application/json','Authorization':'Bearer '+TOKEN},
+        credentials:'include',
+        body: JSON.stringify({ image: base64, media_type: mediaType }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.amount)      document.getElementById('m-amount').value = data.amount;
+        if (data.description) document.getElementById('m-desc').value   = data.description;
+        if (data.date)        document.getElementById('m-date').value   = data.date;
+        toast('📷 Comprovante interpretado!');
+      }
+    } catch {}
+    document.getElementById('photoAnalyzing').style.display = 'none';
+  };
+  reader.readAsDataURL(file);
+}
+
+// ── PROFILE ───────────────────────────────────────────────────────────────────
+async function saveProfile() {
+  const payload = {};
+  const name  = document.getElementById('p-name').value.trim();
+  const login = document.getElementById('p-login').value.trim();
+  const cpf   = document.getElementById('p-cpf').value.trim();
+  const curPwd= document.getElementById('p-current-pwd').value;
+  const newPwd= document.getElementById('p-new-pwd').value;
+  if (name)   payload.name       = name;
+  if (login)  payload.login_name = login;
+  if (cpf)    payload.cpf        = cpf;
+  if (newPwd) { payload.current_password=curPwd; payload.new_password=newPwd; }
+  if (!Object.keys(payload).length) { toast('Nada para salvar', true); return; }
+  try {
+    const me = await api('/auth/profile', {method:'PUT', body:JSON.stringify(payload)});
+    toast('✅ Perfil atualizado!');
+    document.getElementById('m-profileName').textContent = me.name||'—';
+    sessionStorage.setItem('fh_user', JSON.stringify(me));
+  } catch(e) { toast('Erro: '+e.message, true); }
+}
+
+async function doLogout() {
+  await fetch(API+'/auth/logout',{method:'POST',credentials:'include'}).catch(()=>{});
+  sessionStorage.clear();
+  window.location.href = '/';
+}
+
+// ── TABS ──────────────────────────────────────────────────────────────────────
+function showTab(name) {
+  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+  document.querySelectorAll('.tab-item').forEach(t=>t.classList.remove('active'));
+  const view = document.getElementById('tab'+name.charAt(0).toUpperCase()+name.slice(1));
+  const tab  = document.getElementById('tab-'+name);
+  if (view) view.classList.add('active');
+  if (tab)  tab.classList.add('active');
+  if (name==='txs')    renderAllTxList();
+  if (name==='alerts') renderAlerts();
+}
+
+function toast(msg, err=false) {
+  const el = document.getElementById('m-toast');
+  el.textContent=msg; el.className='toast show'+(err?' err':'');
+  setTimeout(()=>el.classList.remove('show'), 3000);
+}
+
+// ── INIT ──────────────────────────────────────────────────────────────────────
+init();
+</script>
+</body>
+</html>
