@@ -66,7 +66,7 @@ router.post('/register', async (req, res) => {
     });
 
     const user = await queryOne('SELECT * FROM users WHERE id=?', [userId]);
-    const { access, refresh } = makeTokens(user);
+    const { access, refresh } = await makeTokens(user);
     res.cookie('fh_access', access, { ...COOKIE, maxAge:15*60*1000 })
        .cookie('fh_refresh', refresh, { ...COOKIE, maxAge:7*24*60*60*1000 })
        .status(201).json({ user: safe(user), token: access });
@@ -113,7 +113,7 @@ router.post('/login', async (req, res) => {
 
     // Relê o usuário após possível promoção
     const freshUser = await queryOne('SELECT * FROM users WHERE id=?', [user.id]);
-    const { access, refresh } = makeTokens(freshUser);
+    const { access, refresh } = await makeTokens(freshUser);
     res.cookie('fh_access', access, { ...COOKIE, maxAge:15*60*1000 })
        .cookie('fh_refresh', refresh, { ...COOKIE, maxAge:7*24*60*60*1000 })
        .json({ user: safe(freshUser), token: access });
@@ -133,7 +133,7 @@ router.post('/refresh', async (req, res) => {
     if (!user) return res.status(401).json({ error: 'Usuário não encontrado' });
     await autoPromoteIfAdmin(user.id, user.email, user.tenant_id);
     const fresh = await queryOne('SELECT * FROM users WHERE id=?', [user.id]);
-    const { access, refresh } = makeTokens(fresh);
+    const { access, refresh } = await makeTokens(fresh);
     res.cookie('fh_access', access, { ...COOKIE, maxAge:15*60*1000 })
        .cookie('fh_refresh', refresh, { ...COOKIE, maxAge:7*24*60*60*1000 })
        .json({ token: access });
@@ -205,7 +205,7 @@ router.post('/promote-admin', verifyToken, async (req, res) => {
   await autoPromoteIfAdmin(user.id, user.email, user.tenant_id);
   const fresh = await queryOne('SELECT * FROM users WHERE id=?', [user.id]);
   // Gera novos tokens com role=admin
-  const { access, refresh } = makeTokens(fresh);
+  const { access, refresh } = await makeTokens(fresh);
   const COOKIE = { httpOnly:true, secure:process.env.NODE_ENV==='production', sameSite:'strict', path:'/' };
   res.cookie('fh_access', access, { ...COOKIE, maxAge:15*60*1000 })
      .cookie('fh_refresh', refresh, { ...COOKIE, maxAge:7*24*60*60*1000 })
